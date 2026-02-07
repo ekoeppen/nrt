@@ -1,0 +1,90 @@
+package main
+
+import (
+	"flag"
+	"fmt"
+	"log"
+	"newton/reconstructor/pkg/analysis"
+	"newton/reconstructor/pkg/asm"
+	"sort"
+	"strings"
+)
+
+func main() {
+	asmPath := flag.String("asm", "MP2x00US.s", "Path to assembly file")
+	className := flag.String("class", "", "Class name to analyze")
+	flag.Parse()
+
+	if *className == "" {
+		log.Fatalf("Please provide a class name using -class")
+	}
+
+	log.Printf("Loading assembly...")
+	symbols, _, err := asm.ParseFile(*asmPath)
+	if err != nil {
+		log.Fatalf("Load error: %v", err)
+	}
+
+	log.Printf("Running analysis engine...")
+	engine := analysis.NewEngine(symbols)
+	engine.Analyze()
+
+	meta, ok := engine.Classes[*className]
+	if !ok {
+		fmt.Printf("Class %s not found in metadata. Showing raw field accesses if available.\n", *className)
+	} else {
+		fmt.Printf("\n=== Class Analysis: %s ===\n", meta.Name)
+		if meta.Size > 0 {
+			fmt.Printf("  Size:       %d bytes\n", meta.Size)
+		} else {
+			fmt.Printf("  Size:       Unknown (no 'new' call found in constructor)\n")
+		}
+		if meta.BaseClass != "" {
+			fmt.Printf("  Base Class: %s\n", meta.BaseClass)
+		} else {
+			fmt.Printf("  Base Class: None (or not detected)\n")
+		}
+	}
+
+	fmt.Printf("\n--- Discovered Fields ---\n")
+	fieldUsers := engine.FieldUsers[*className]
+	if len(fieldUsers) == 0 {
+		fmt.Println("  No direct field accesses found.")
+	} else {
+		var offsets []int
+		for off := range fieldUsers {
+			offsets = append(offsets, int(off))
+		}
+		sort.Ints(offsets)
+
+		for _, off := range offsets {
+			uOff := uint64(off)
+			accesses := fieldUsers[uOff]
+			
+			fieldType := "long"
+			for _, acc := range accesses {
+				// Simple check on the first instruction of the function that accesses it
+				if strings.HasSuffix(acc.Func.Instructions[0].Mnemonic, "b") {
+					// This logic is a bit flawed but serves as a placeholder
+				}
+			}
+			
+			fmt.Printf("  [Offset %3d] %s (%d accesses)\n", off, fieldType, len(accesses))
+			
+			// Show first few accessors
+			limit := 3
+			for i, acc := range accesses {
+				if i >= limit {
+					fmt.Printf("      ... and %d more\n", len(accesses)-limit)
+					break
+				}
+				typeStr := "Read"
+				if acc.Type == analysis.Write {
+					typeStr = "Write"
+				}
+				fmt.Printf("      - %s: %s (at 0x%x)\n", typeStr, acc.Func.Name, acc.Addr)
+			}
+		}
+	}
+	fmt.Println()
+}
