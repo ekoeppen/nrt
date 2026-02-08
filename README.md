@@ -132,7 +132,7 @@ The implementation of the OS objects themselves.
 *   [x] `TKDomain` (listed as `TDomain`)
 *   [ ] `TMonitor`
 *   [x] `TSystemEvent`
-*   [ ] `TProtocol`
+*   [x] `TProtocol` (and `TClassInfo`)
 
 #### **Phase 4: System Management & Infrastructure**
 Complex orchestrators and memory management.

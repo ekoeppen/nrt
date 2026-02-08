@@ -149,3 +149,11 @@ The following classes have been fully reverse engineered from ARM assembly to hi
     *   `TSendSystemEvent` (44 bytes) inherits from `TSystemEvent` and adds a `TUSharedMemMsg` for sending event data.
     *   Communicates with the NameServer port (ID 2) using `TSysEventRequest` messages.
 *   **Methodology**: Mapped `TSysEventRequest` field offsets. Verified class inheritance and member placement for `TSendSystemEvent` (offset 12 for the shared memory message).
+
+### **TProtocol & TClassInfo Reconstruction**
+*   **Status**: Completed.
+*   **Findings**:
+    *   `TProtocol` (16 bytes) is the base class for the NewtonOS protocol system, using a custom dispatch table (`fBTable`) mechanism.
+    *   `TClassInfo` (48 bytes) provides meta-information for protocols, including offsets to implementation names, interface names, and entry points for monitors.
+    *   The protocol dispatch mechanism uses ARM branch instructions directly in the `BTable` for high-speed calls.
+*   **Methodology**: Analyzed the self-relative offset (SRO) pattern in `TClassInfo` for name and table resolution. Reconstructed the `StartMonitor` and `DestroyMonitor` lifecycle methods which bridge the protocol and monitor systems.
