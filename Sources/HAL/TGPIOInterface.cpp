@@ -24,30 +24,30 @@ public:
     int MapFunctionToBitMask(unsigned char func, unsigned long *mask);
 
 protected:
-    void *          fRExConfig;     // 0
-    volatile ULong *fField4;        // 4  0xF018C000
-    volatile ULong *fField8;        // 8  0xF018C400
-    volatile ULong *fField12;       // 12 0xF018C800
-    volatile ULong *fField16;       // 16 0xF018CC00
-    volatile ULong *fField20;       // 20 0xF108D000
-    volatile ULong *fField24;       // 24 0xF108D400
-    volatile ULong *fField28;       // 28 0xF108D800
+    void *          fRExConfig;         // 0  - REx configuration entry
+    volatile ULong *fGPIOIntStatus;     // 4  - 0xF018C000 - GPIO interrupt status register
+    volatile ULong *fGPIOIntEnable;     // 8  - 0xF018C400 - GPIO interrupt enable register
+    volatile ULong *fGPIOIntClear;      // 12 - 0xF018C800 - GPIO interrupt clear register
+    volatile ULong *fGPIOPolarity;      // 16 - 0xF018CC00 - GPIO polarity control register
+    volatile ULong *fGPIOIntConfig;     // 20 - 0xF108D000 - GPIO interrupt configuration register
+    volatile ULong *fGPIODataIn;        // 24 - 0xF108D400 - GPIO data input register
+    volatile ULong *fGPIOIntMask;       // 28 - 0xF108D800 - GPIO interrupt mask register
     
-    unsigned long   fField32;       // 32
-    GPIOIntObject   fIntObjects[13]; // 36
+    unsigned long   fInterruptId;       // 32 - Registered interrupt ID
+    GPIOIntObject   fIntObjects[13];    // 36 - Array of GPIO interrupt objects (13 GPIO pins)
 };
 
 extern "C" void * GetLastRExConfigEntry();
 
 void TGPIOInterface::Init() {
-    fField4 = (volatile ULong *)0xF018C000;
-    fField8 = (volatile ULong *)0xF018C400;
-    fField12 = (volatile ULong *)0xF018C800;
-    fField16 = (volatile ULong *)0xF018CC00;
-    fField20 = (volatile ULong *)0xF108D000;
-    fField24 = (volatile ULong *)0xF108D400;
-    fField28 = (volatile ULong *)0xF108D800;
-    fField32 = 0;
+    fGPIOIntStatus = (volatile ULong *)0xF018C000;
+    fGPIOIntEnable = (volatile ULong *)0xF018C400;
+    fGPIOIntClear = (volatile ULong *)0xF018C800;
+    fGPIOPolarity = (volatile ULong *)0xF018CC00;
+    fGPIOIntConfig = (volatile ULong *)0xF108D000;
+    fGPIODataIn = (volatile ULong *)0xF108D400;
+    fGPIOIntMask = (volatile ULong *)0xF108D800;
+    fInterruptId = 0;
     
     fRExConfig = GetLastRExConfigEntry();
     
