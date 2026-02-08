@@ -214,7 +214,7 @@ Specialized classes for various network and telephony protocols.
 
 #### **Phase 3: Service Management**
 Infrastructure for managing communication services and asynchronous messages.
-*   [ ] `TCMService`
+*   [x] `TCMService`
 *   [x] `TServiceInfo`
 *   [x] `TAsyncServiceMessage`
 

@@ -1,7 +1,7 @@
 /*
 	File:		CMService.h
 
-	Copyright:	© 1992, 1994-1995 by Apple Computer, Inc., all rights reserved.
+	Copyright:	Â© 1992, 1994-1995 by Apple Computer, Inc., all rights reserved.
 
 	Derived from v9 internal.
 
@@ -20,19 +20,19 @@
 #endif
 
 #ifndef __PROTOCOLS_H
-#include "Protocols.h"
+#include "OS600/Protocols.h"
 #endif
 
 #ifndef	__USERPORTS_H
-#include "UserPorts.h"
+#include "OS600/UserPorts.h"
 #endif
 
 #ifndef	__COMMMANAGERINTERFACE_H
-#include "CommManagerInterface.h"
+#include "CommAPI/CommManagerInterface.h"
 #endif
 
 #ifndef __OPTIONARRAY_H
-#include "OptionArray.h"
+#include "CommAPI/OptionArray.h"
 #endif
 
 #define kServiceInterfaceName		"TCMService"
@@ -91,12 +91,6 @@ inline TCMService* TAsyncServiceMessage::Service()
 
 	DoneStarting:	called when Start has completed
 
-	** possible additions **
-	Terminate:		to terminate the associated service
-	Message:		when the system needs to inform the service of some system event
-	SetOptions:		to set "configuration" options
-	GetOptions: 	to get the current set of configuration options
-
    -------------------------------------------------------------------------------- */
 
 
@@ -106,10 +100,12 @@ PROTOCOL TCMService : public TProtocol
 	public:
 
 	static	TCMService*	New(char*);
-			void		Delete();
+	
+	VIRTUAL void		Init() ENDVIRTUAL;
+	VIRTUAL void		Delete() ENDVIRTUAL;
 
-			NewtonErr	Start(TOptionArray* options, ULong serviceId, TServiceInfo* serviceInfo);		// start the service
-			NewtonErr	DoneStarting(TAEvent* event, ULong size, TServiceInfo* serviceInfo);			// called back when done starting
+	VIRTUAL	NewtonErr	Start(TOptionArray* options, ULong serviceId, TServiceInfo* serviceInfo) ENDVIRTUAL;
+	VIRTUAL	NewtonErr	DoneStarting(TAEvent* event, ULong size, TServiceInfo* serviceInfo) ENDVIRTUAL;
 
 };
 
