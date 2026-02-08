@@ -23,9 +23,9 @@ TSerialChipVoyager* TSerialChipVoyager::New(void) {
     // The 'this' pointer is passed in r0.
     TSerialChipVoyager* chip = (TSerialChipVoyager*)this; // This is a simplification
     
-    chip->fField40 = -1;
+    chip->fChipType = -1;
     
-    // Copy some initial data to fField92
+    // Copy some initial data to &fLineControl
     // 1d8dac: ldr r1, [pc, #58] ; points to 0x1d8e0c
     // 1d8db0: ldmia r1!, {r3, ip}
     // 1d8db4: stmia r0!, {r3, ip}
@@ -34,22 +34,22 @@ TSerialChipVoyager* TSerialChipVoyager::New(void) {
         0x7c, 0x76, 0x37, 0x00, // From 1d8e0c (reversed or direct?)
         // ...
     };
-    memcpy(chip->fField92, kInitialData, 16);
+    memcpy(&chip->fLineControl, kInitialData, 16);
     
-    chip->fField108 = 0;
-    chip->fField86 = 0;
+    chip->fInterruptObject = 0;
+    chip->fIsRegistered = 0;
     
     // Initialize DelayTimer
     // chip->fDelayTimer is at offset 72
     new (&chip->fDelayTimer) TDelayTimer();
     
     chip->fBaseAddress = 0;
-    chip->fField85 = 0;
-    chip->fField87 = 1;
-    chip->fField156 = 0;
-    chip->fField116 = 0;
-    chip->fDMAEngine = 0;
-    chip->fField148 = 0;
+    chip->fPowerOn = 0;
+    chip->fReconfigure = 1;
+    chip->fIRControl = 0;
+    chip->fTxDMAEngine = 0;
+    chip->fRxDMAEngine = 0;
+    chip->fLocalTalkTimer = 0;
     
     chip->fFIQTimer = $GetFIQTimerObject();
     
@@ -64,9 +64,9 @@ TSerialChipVoyager* TSerialChipVoyager::New(void) {
  */
 void TSerialChipVoyager::Delete(void) {
     // Destructor logic
-    if (fDMAEngine) {
-        delete fDMAEngine;
-        fDMAEngine = 0;
+    if (fRxDMAEngine) {
+        delete fRxDMAEngine;
+        fRxDMAEngine = 0;
     }
 }
 
@@ -79,20 +79,20 @@ void TSerialChipVoyager::InitializeForNextHandler(void) {
     memset(&fIntHandlers, 0, sizeof(fIntHandlers));
     
     fField84 = 0;
-    fField140 = 0;
-    fField141 = 0;
-    fField142 = 0;
-    fField143 = 0;
+    fDMASupported = 0;
+    fTxDMAState = 0;
+    fTxDMAPaused = 0;
+    fRxDMAState = 0;
     fField160 = 0;
     fField161 = 0;
     fField162 = 0;
     fField163 = 0;
     
-    fField116 = 0;
+    fTxDMAEngine = 0;
     fField164 = 0;
     fField168 = 0;
     fField172 = 0;
-    fField148 = 0;
+    fLocalTalkTimer = 0;
 }
 
 /**
@@ -126,13 +126,13 @@ NewtonErr TSerialChipVoyager::InitByOption(TOption * option) {
     VoyagerOption * vo = (VoyagerOption *)option;
 
     fBaseAddress = vo->baseAddress;
-    fField40 = vo->field16;
-    fField44 = vo->field24;
-    fField48 = vo->field28;
+    fChipType = vo->field16;
+    fClockRate = vo->field24;
+    fSerialMode = vo->field28;
     
-    fField60 = 0; // Wait, fField60 was accessed?
+    fSerialModeFlags = 0; // Wait, fSerialModeFlags was accessed?
     
-    // ... logic for fField140 and DMA engine ...
+    // ... logic for fDMASupported and DMA engine ...
     // This part is complex, will refine later.
     
     return 0;
@@ -151,7 +151,7 @@ NewtonErr TSerialChipVoyager::InstallChipHandler(void * serialTool, SCCChannelIn
     memcpy(&fIntHandlers, intHandlers, sizeof(fIntHandlers));
     
     fField84 = 0;
-    SetSerialMode(fField48);
+    SetSerialMode(fSerialMode);
     
     return 0;
 }
@@ -174,19 +174,19 @@ NewtonErr TSerialChipVoyager::RemoveChipHandler(void * serialTool) {
  * Address: 001d6af0
  */
 void TSerialChipVoyager::PutByte(unsigned char nextChar) {
-    unsigned char status = fField100;
+    unsigned char status = fInterruptEnableReg;
     if (!(status & 0x80)) {
-        if (fField60 & 0x08) {
+        if (fSerialModeFlags & 0x08) {
             return;
         }
     }
     
-    fField100 |= 0x80;
+    fInterruptEnableReg |= 0x80;
     unsigned char * base = (unsigned char *)fBaseAddress;
     
     // Control registers at 0x3000
     *(base + 0x3C00) = 0x80;
-    *(base + 0x3000) = fField100;
+    *(base + 0x3000) = fInterruptEnableReg;
     
     // Data register at 0x6000
     *(base + 0x6000) = nextChar;
@@ -227,8 +227,8 @@ Boolean TSerialChipVoyager::RxBufFull(void) {
  * Address: 001d6b3c
  */
 void TSerialChipVoyager::ResetTxBEmpty(void) {
-    if (fField100 & 0x80) {
-        fField100 &= ~0x80;
+    if (fInterruptEnableReg & 0x80) {
+        fInterruptEnableReg &= ~0x80;
         unsigned char * base = (unsigned char *)fBaseAddress;
         *(base + 0x3100) = 0x80;
     }
@@ -244,13 +244,13 @@ unsigned long TSerialChipVoyager::SetSpeed(unsigned long bitsPerSec) {
     }
     
     // Check for maximum speed if some bits are set
-    if (fField132 & 0x03) {
+    if (fField84 & 0x03) {
         if (bitsPerSec > 115200) {
             return 0;
         }
     }
     
-    unsigned long divisor = fField44 / bitsPerSec;
+    unsigned long divisor = fClockRate / bitsPerSec;
     if (divisor == 0) return 0;
     
     unsigned char * base = (unsigned char *)fBaseAddress;
@@ -276,12 +276,12 @@ void TSerialChipVoyager::SerialInterrupt(void) {
         unsigned char status2 = status_base[0x400]; // Offset 0x4400
         unsigned char combined_status = status1 | (status2 & 0xE0);
         
-        unsigned char pending = combined_status & fField100;
+        unsigned char pending = combined_status & fInterruptEnableReg;
         if (pending == 0) break;
         
         if (pending & 0x20) { // Receive
             ctrl[0xC00] = 0x20; // Clear int
-            if (fField143 == 2) {
+            if (fRxDMAState == 2) {
                 AsyncDMAInInt();
             } else {
                 if (status2 & 0x20) {
@@ -292,10 +292,10 @@ void TSerialChipVoyager::SerialInterrupt(void) {
         }
         else if (pending & 0x40) { // Transmit
             ctrl[0xC00] = 0x40; // Clear int
-            if (fField143 == 2) {
+            if (fRxDMAState == 2) {
                 SetIntSourceEnable(0x40, 0);
                 typedef void (*Handler)(void *);
-                ((Handler)fField132)(fSerialTool); // Wait, offset 132 is a handler?
+                ((Handler)fRxDMACallback)(fSerialTool); // Wait, offset 132 is a handler?
             } else {
                 if (status2 & 0x40) {
                     typedef void (*Handler)(void *);
