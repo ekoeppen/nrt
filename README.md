@@ -52,7 +52,7 @@ For specific help on any command, run `nrt <command> --help`.
 
 This document outlines the methodology, findings, and toolkit developed for reconstructing the Newton OS source code from a 42MB ARM disassembly (`MP2x00US.s`).
 
-## 1. Overall Approach: The Reconstruction Pipeline
+## Overall Approach: The Reconstruction Pipeline
 
 The project follows a "Binary to Semantic" pipeline to transform flat assembly into architectural insights:
 
@@ -63,7 +63,7 @@ The project follows a "Binary to Semantic" pipeline to transform flat assembly i
 
 ---
 
-## 2. The Toolkit (NRT - Newton Reconstruction Toolkit)
+## The Toolkit (NRT - Newton Reconstruction Toolkit)
 
 Located in `tools/reconstructor/`, this Go-based suite provides the "brain" for the analysis:
 
@@ -76,22 +76,9 @@ Located in `tools/reconstructor/`, this Go-based suite provides the "brain" for 
 *   **`nrt atomic`**: Pattern recognizer for atomic hardware transactions.
 *   **`nrt inspect`**: High-performance disassembly navigation and cross-referencing.
 
-## 4. Lessons Learned
-
-### **What Worked Well**
-*   **Go-based Tooling**: Parsing the 42MB file in memory using Go is nearly instantaneous, allowing for rapid iteration on reconstruction logic.
-*   **Header Semantic Injection**: Automating the mapping of offsets to names from the DDK headers was the single biggest "unlock" for readability.
-*   **Side-by-Side View**: Keeping the assembly as comments inside the reconstructed C++ methods provides a "ground truth" that prevents logic errors.
-
-### **Challenges & Failed Attempts**
-*   **The "Grep Problem"**: Initial attempts to use shell tools for cross-referencing failed due to the sheer number of false positives. Symbolic analysis (knowing that `r4` holds `this`) was required.
-*   **Mangled Name Ambiguity**: Some internal Apple classes aren't in the DDK. For these, we have to infer names based on their neighbors in the VTable, which is an ongoing "detective" process.
-
-
 ## Coverage Plan
 
 General principle: Start with leaf classes which have no or few outgoing dependencies, then work up.
-
 
 ### **OS600 Subsystem Coverage Plan**
 
@@ -228,8 +215,8 @@ Specialized classes for various network and telephony protocols.
 #### **Phase 3: Service Management**
 Infrastructure for managing communication services and asynchronous messages.
 *   [ ] `TCMService`
-*   [ ] `TServiceInfo`
-*   [ ] `TAsyncServiceMessage`
+*   [x] `TServiceInfo`
+*   [x] `TAsyncServiceMessage`
 
 #### **Phase 4: Endpoints & Event Handling**
 The primary client-facing API and the asynchronous event model.
