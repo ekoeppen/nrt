@@ -177,9 +177,9 @@ The infrastructure for event-driven hardware interaction.
 Moving data between memory and external interfaces.
 *   [ ] `TDMAChannel`
 *   [ ] `TDMAManager`
-*   [ ] `TSerialChip` (Base class)
+*   [x] `TSerialChip` (Base class protocol)
 *   [ ] `TSerialChip16450` (Standard UART)
-*   [ ] `TSerialChipVoyager` (MP2k-specific UART)
+*   [x] `TSerialChipVoyager` (MP2k-specific UART)
 
 #### **Phase 4: Input/Output & Power Drivers**
 Core human-interface and system power logic.

@@ -170,3 +170,13 @@ The following classes have been fully reverse engineered from ARM assembly to hi
     *   HAL classes use a "Configuration Entry" system (`GetLastRExConfigEntry`) to map logical functions to hardware bits, allowing for platform flexibility.
     *   Atomic operations (`EnterAtomic`/`ExitAtomic`) are heavily used for register read-modify-write cycles.
     *   Register mapping follows a consistent `0x400` byte stride for sub-modules within the ASICs.
+
+### **Serial Communication: `TSerialChip` (Protocol Glue)**
+*   **Status**: Fully reconstructed.
+*   **Findings**:
+    *   `TSerialChip` in the ROM is a **Protocol Glue** class. It doesn't contain the hardware logic itself but acts as a proxy/delegate.
+    *   It manages two key fields: `fRealThis` (pointer to the implementation object) and `fBTable` (pointer to the protocol dispatch table).
+    *   The class implements 45 protocol methods (Slots 2-47) which it forwards to the implementation.
+    *   The methods include core serial I/O (`PutByte`, `GetByte`), DMA setup (`InitTxDMA`, `InitRxDMA`), and power management.
+    *   Instantiation via `TSerialChip::New(char* implementation)` uses `AllocInstanceByName` to dynamically link the hardware-specific driver.
+*   **Methodology Improvement**: Successfully mapped the entire 45-slot protocol table by analyzing the ARM branch patterns and correlating with `SerialChipV2.h` DDK headers.
