@@ -220,7 +220,51 @@ Infrastructure for managing communication services and asynchronous messages.
 
 #### **Phase 4: Endpoints & Event Handling**
 The primary client-facing API and the asynchronous event model.
-*   [ ] `TEndpoint`
-*   [ ] `TAEvent`
-*   [ ] `TAEventHandler`
-*   [ ] `TEndpointEventHandler`
+*   [x] `TEndpoint`
+*   [x] `TEndpointEventHandler`
+
+#### **Summary**
+**CommAPI Classes Completed: 10/17** (59%)
+- Core options system: 5/5 complete
+- Service management: 3/3 complete  
+- Endpoint framework: 2/2 complete
+- Address types: 0/4 (future work)
+- Transport info: 0/3 (future work)
+
+### **UtilityClasses Subsystem Coverage Plan**
+
+General-purpose utility classes used across the OS.
+
+#### **Phase 1: Event Handling**
+Asynchronous event system for inter-task communication.
+*   [x] `TAEvent`
+*   [x] `TAEventHandler`
+*   [x] `TAEHandlerIterator`
+*   [ ] `TAEIdleTimer`
+*   [ ] `TSystemEventHandler`
+
+#### **Phase 2: Memory & Collections**
+Data structures and buffer management.
+*   [x] `CBufferSegment`
+*   [x] `CItemComparer`
+*   [x] `CList`
+*   [x] `CArrayIterator`
+*   [x] `CBufferList`
+*   [x] `CBufferPipe`
+*   [x] `CShadowBufferSegment`
+*   [x] `CPtrPipe`
+*   [x] `CNullPipe`
+*   [x] `CDynamicArray`
+*   [x] `CSortedList`
+*   [x] `CListIterator`
+*   [x] `TSingleQ`
+
+#### **Phase 3: Ring Buffers & Specialized Structures**
+*   [x] `TBaseRingBuffer`
+*   [x] `TRingBuffer`
+*   [x] `TMemObject`
+
+#### **Phase 4: Other Utilities**
+*   [ ] `TTime`
+*   [ ] `TCircleBuf`
+*   [ ] `UnicodeUtilities`
