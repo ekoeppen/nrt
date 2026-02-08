@@ -122,8 +122,8 @@ Classes that wrap kernel primitives for user-mode tasks.
 #### **Phase 3: Core Kernel Primitives**
 The implementation of the OS objects themselves.
 
-*   [ ] `TSemaphore`
-*   [ ] `TSemaphoreGroup`
+*   [x] `TSemaphore`
+*   [x] `TSemaphoreGroup`
 *   [ ] `TTask`
 *   [x] `TUTask`
 *   [ ] `TUTaskWorld`

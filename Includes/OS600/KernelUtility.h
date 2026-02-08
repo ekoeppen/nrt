@@ -43,23 +43,6 @@ public:
 #endif
 
 /*
-** TSemaphoreOpList
-** Kernel-side semaphore operation list.
-*/
-class TSemaphoreOpList
-{
-public:
-	long	Init(ULong numInList, ...);
-	~TSemaphoreOpList();
-
-protected:
-	// Header (16 bytes)
-	ULong	fHeader[4];
-	ULong*	fOps;		// Offset 16
-	ULong	fCount;		// Offset 20
-};
-
-/*
 ** TSharedMem
 ** Kernel-side shared memory object.
 */
