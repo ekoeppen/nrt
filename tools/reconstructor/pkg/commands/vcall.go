@@ -1,43 +1,56 @@
-package main
+package commands
 
 import (
-	"flag"
 	"fmt"
 	"log"
-	"newton/reconstructor/pkg/asm"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"newton/reconstructor/pkg/asm"
+	"github.com/spf13/cobra"
 )
 
-func main() {
-	asmPath := flag.String("asm", "MP2x00US.s", "Path to assembly file")
-	className := flag.String("class", "", "Class name to analyze")
-	offsetStr := flag.String("offset", "", "Offset in decimal or hex (e.g. 56 or 0x38)")
-	flag.Parse()
+var (
+	vcallClassName string
+	vcallOffsetStr string
+)
 
-	if *className == "" || *offsetStr == "" {
-		log.Fatalf("Please provide -class and -offset")
-	}
+var vcallCmd = &cobra.Command{
+	Use:   "vcall",
+	Short: "Resolve virtual calls to method names",
+	Run: func(cmd *cobra.Command, args []string) {
+		runVCall()
+	},
+}
 
-	offset, err := parseOffset(*offsetStr)
+func init() {
+	vcallCmd.Flags().StringVar(&vcallClassName, "class", "", "Class name to analyze")
+	vcallCmd.Flags().StringVar(&vcallOffsetStr, "offset", "", "Offset in decimal or hex (e.g. 56 or 0x38)")
+	vcallCmd.MarkFlagRequired("class")
+	vcallCmd.MarkFlagRequired("offset")
+	rootCmd.AddCommand(vcallCmd)
+}
+
+func runVCall() {
+	offset, err := parseOffset(vcallOffsetStr)
 	if err != nil {
 		log.Fatalf("Invalid offset: %v", err)
 	}
 
-	log.Printf("Loading assembly...")
-	symbols, _, err := asm.ParseFile(*asmPath)
+	log.Printf("Loading assembly from %s...", asmPath)
+	symbols, _, err := asm.ParseFile(asmPath)
 	if err != nil {
 		log.Fatalf("Load error: %v", err)
 	}
 
 	// 1. Find the constructor to get the VTable address
-	vtableAddr := findVTableAddr(symbols, *className)
+	vtableAddr := findVTableAddr(symbols, vcallClassName)
 	if vtableAddr == 0 {
-		log.Fatalf("Could not find VTable address for class %s", *className)
+		log.Fatalf("Could not find VTable address for class %s", vcallClassName)
 	}
 
-	fmt.Printf("Class:          %s\n", *className)
+	fmt.Printf("Class:          %s\n", vcallClassName)
 	fmt.Printf("VTable Address: 0x%x\n", vtableAddr)
 
 	// 2. Resolve the slot
@@ -97,7 +110,7 @@ func findVTableAddr(symbols []*asm.Function, className string) uint64 {
 
 func resolveSlot(symbols []*asm.Function, vtableAddr uint64, slot int) string {
 	targetAddr := vtableAddr + uint64(slot*4)
-	
+
 	// Find the symbol at this address
 	for _, sym := range symbols {
 		if sym.AddressInt == targetAddr {

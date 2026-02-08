@@ -1,26 +1,37 @@
-package main
+package commands
 
 import (
-	"flag"
 	"fmt"
 	"log"
-	"newton/reconstructor/pkg/analysis"
-	"newton/reconstructor/pkg/asm"
 	"sort"
 	"strings"
+
+	"newton/reconstructor/pkg/analysis"
+	"newton/reconstructor/pkg/asm"
+	"github.com/spf13/cobra"
 )
 
-func main() {
-	asmPath := flag.String("asm", "MP2x00US.s", "Path to assembly file")
-	className := flag.String("class", "", "Class name to analyze")
-	flag.Parse()
+var (
+	analyzeClassName string
+)
 
-	if *className == "" {
-		log.Fatalf("Please provide a class name using -class")
-	}
+var analyzeCmd = &cobra.Command{
+	Use:   "analyze",
+	Short: "Determine class sizes and base classes",
+	Run: func(cmd *cobra.Command, args []string) {
+		runAnalyze()
+	},
+}
 
-	log.Printf("Loading assembly...")
-	symbols, _, err := asm.ParseFile(*asmPath)
+func init() {
+	analyzeCmd.Flags().StringVar(&analyzeClassName, "class", "", "Class name to analyze")
+	analyzeCmd.MarkFlagRequired("class")
+	rootCmd.AddCommand(analyzeCmd)
+}
+
+func runAnalyze() {
+	log.Printf("Loading assembly from %s...", asmPath)
+	symbols, _, err := asm.ParseFile(asmPath)
 	if err != nil {
 		log.Fatalf("Load error: %v", err)
 	}
@@ -29,9 +40,9 @@ func main() {
 	engine := analysis.NewEngine(symbols)
 	engine.Analyze()
 
-	meta, ok := engine.Classes[*className]
+	meta, ok := engine.Classes[analyzeClassName]
 	if !ok {
-		fmt.Printf("Class %s not found in metadata. Showing raw field accesses if available.\n", *className)
+		fmt.Printf("Class %s not found in metadata. Showing raw field accesses if available.\n", analyzeClassName)
 	} else {
 		fmt.Printf("\n=== Class Analysis: %s ===\n", meta.Name)
 		if meta.Size > 0 {
@@ -47,7 +58,7 @@ func main() {
 	}
 
 	fmt.Printf("\n--- Discovered Fields ---\n")
-	fieldUsers := engine.FieldUsers[*className]
+	fieldUsers := engine.FieldUsers[analyzeClassName]
 	if len(fieldUsers) == 0 {
 		fmt.Println("  No direct field accesses found.")
 	} else {
@@ -60,7 +71,7 @@ func main() {
 		for _, off := range offsets {
 			uOff := uint64(off)
 			accesses := fieldUsers[uOff]
-			
+
 			fieldType := "long"
 			for _, acc := range accesses {
 				// Simple check on the first instruction of the function that accesses it
@@ -68,9 +79,9 @@ func main() {
 					// This logic is a bit flawed but serves as a placeholder
 				}
 			}
-			
+
 			fmt.Printf("  [Offset %3d] %s (%d accesses)\n", off, fieldType, len(accesses))
-			
+
 			// Show first few accessors
 			limit := 3
 			for i, acc := range accesses {

@@ -1,29 +1,42 @@
-package main
+package commands
 
 import (
-	"flag"
 	"fmt"
 	"log"
-	"newton/reconstructor/pkg/asm"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+
+	"newton/reconstructor/pkg/asm"
+	"github.com/spf13/cobra"
 )
 
-func main() {
-	asmPath := flag.String("asm", "MP2x00US.s", "Path to assembly file")
-	cmd := flag.String("cmd", "lookup", "Command: lookup, xref, body, range")
-	target := flag.String("target", "", "Target symbol, address, or regex")
-	endAddr := flag.String("end", "", "End address for 'range' command")
-	flag.Parse()
+var (
+	inspectCmdType string
+	inspectTarget  string
+	inspectEndAddr string
+)
 
-	if *target == "" {
-		log.Fatalf("Please provide a -target")
-	}
+var inspectCmd = &cobra.Command{
+	Use:   "inspect",
+	Short: "High-performance disassembly navigation and cross-referencing",
+	Run: func(cmd *cobra.Command, args []string) {
+		runInspect()
+	},
+}
 
-	log.Printf("Loading and indexing assembly...")
-	functions, _, err := asm.ParseFile(*asmPath)
+func init() {
+	inspectCmd.Flags().StringVar(&inspectCmdType, "cmd", "lookup", "Command: lookup, xref, body, range")
+	inspectCmd.Flags().StringVar(&inspectTarget, "target", "", "Target symbol, address, or regex")
+	inspectCmd.Flags().StringVar(&inspectEndAddr, "end", "", "End address for 'range' command")
+	inspectCmd.MarkFlagRequired("target")
+	rootCmd.AddCommand(inspectCmd)
+}
+
+func runInspect() {
+	log.Printf("Loading and indexing assembly from %s...", asmPath)
+	functions, _, err := asm.ParseFile(asmPath)
 	if err != nil {
 		log.Fatalf("Load error: %v", err)
 	}
@@ -37,17 +50,17 @@ func main() {
 		addrMap[fn.AddressInt] = fn
 	}
 
-	switch *cmd {
+	switch inspectCmdType {
 	case "lookup":
-		doLookup(functions, *target)
+		doLookup(functions, inspectTarget)
 	case "xref":
-		doXRef(functions, addrMap, *target)
+		doXRef(functions, addrMap, inspectTarget)
 	case "body":
-		doBody(nameMap, addrMap, *target)
+		doBody(nameMap, addrMap, inspectTarget)
 	case "range":
-		doRange(addrMap, *target, *endAddr)
+		doRange(addrMap, inspectTarget, inspectEndAddr)
 	default:
-		log.Fatalf("Unknown command: %s", *cmd)
+		log.Fatalf("Unknown command: %s", inspectCmdType)
 	}
 }
 
@@ -125,7 +138,7 @@ func doRange(addrMap map[uint64]*asm.Function, startStr, endStr string) {
 	}
 
 	fmt.Printf("\n--- Range 0x%X - 0x%X ---\n", start, end)
-	
+
 	// Since instructions are grouped by function, we need to iterate functions
 	// This is slightly inefficient but works with current pkg/asm structure.
 	var keys []uint64

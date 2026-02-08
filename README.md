@@ -12,40 +12,41 @@ Detailed process is documented [here](docs/progress.md).
 
 ## Toolkit Quick-Reference Guide
 
-Use this guide to select the right tool for each reconstruction scenario.
+Use the Newton Reconstruction Toolkit (`nrt`) to analyze and scaffold classes.
 
-| If you want to... | Use this Tool | Notes |
+| If you want to... | Use this Command | Notes |
 | :--- | :--- | :--- |
-| **Start a new class reconstruction** | `scaffolder` | Generates the initial `.cpp` file with grouped assembly. |
-| **Determine class size & base class** | `analyzer` | Identifies `new` calls and base class constructors. |
-| **Identify all fields in a class** | `analyzer` | Builds a unified memory map of all field offsets (`fFieldN`). |
-| **Resolve a virtual call (e.g. slot 14)** | `vcall` | Maps the VTable offset to a human-readable method name. |
-| **Find who calls a specific method** | `query` | Performs a symbolic search for all caller functions. |
-| **Find who writes to a specific field** | `query` | Search for all accessors of a specific `Class:Offset`. |
-| **Visualize subsystem dependencies** | `viz` | Generates a Mermaid-format call graph for architectural mapping. |
-| **Identify hardware registers (MMIO)** | `regmap` | Maps hex addresses (e.g., `0xF0050000`) to official register names. |
-| **Map a class VTable (all slots)** | `vmap` | Traces constructors to build the complete, ordered virtual method map. |
-| **Analyze critical hardware sections** | `atomic` | Groups code within `EnterAtomic` blocks to reveal register logic. |
-| **Find symbols or cross-references** | `inspector` | Fast, indexed lookup of function bodies and global call-sites. |
+| **Start a new class reconstruction** | `nrt scaffold` | Generates the initial `.cpp` file with grouped assembly. |
+| **Determine class size & base class** | `nrt analyze` | Identifies `new` calls and base class constructors. |
+| **Identify all fields in a class** | `nrt analyze` | Builds a unified memory map of all field offsets (`fFieldN`). |
+| **Resolve a virtual call (e.g. slot 14)** | `nrt vcall` | Maps the VTable offset to a human-readable method name. |
+| **Find who calls a specific method** | `nrt query` | Performs a symbolic search for all caller functions. |
+| **Find who writes to a specific field** | `nrt query` | Search for all accessors of a specific `Class:Offset`. |
+| **Visualize subsystem dependencies** | `nrt viz` | Generates a Mermaid-format call graph for architectural mapping. |
+| **Identify hardware registers (MMIO)** | `nrt regmap` | Maps hex addresses (e.g., `0xF0050000`) to official register names. |
+| **Map a class VTable (all slots)** | `nrt vmap` | Traces constructors to build the complete, ordered virtual method map. |
+| **Analyze critical hardware sections** | `nrt atomic` | Groups code within `EnterAtomic` blocks to reveal register logic. |
+| **Find symbols or cross-references** | `nrt inspect` | Fast, indexed lookup of function bodies and global call-sites. |
 
 ### **General Usage Instructions**
 
-All tools are located in `tools/reconstructor/` and can be run using `go run`.
+The toolkit is managed using the `task` utility.
 
-1. **Navigate to the toolkit directory**:
-   ```bash
-   cd tools/reconstructor
-   ```
+1.  **Build and Install**:
+    ```bash
+    task install
+    ```
+    This will build the `nrt` binary and install it to your path.
 
-2. **Run a tool**:
-   ```bash
-   go run cmd/<tool_name>/main.go -asm ../../MP2x00US.s [options]
-   ```
+2.  **Run a command**:
+    ```bash
+    nrt <command> --asm MP2x00US.s [options]
+    ```
 
-*   **`<tool_name>`**: Use `scaffolder`, `analyzer`, `vcall`, `query`, `viz`, `regmap`, `vmap`, `atomic`, or `inspector`.
-*   **`-asm`**: Path to the 42MB disassembly file (relative to the tool directory).
+*   **`--asm`**: Path to the 42MB disassembly file.
+*   **`--headers`**: Path to the Newton C++ headers directory (default: `Includes`).
 
-For specific help on any tool, run it without arguments or with `-h`.
+For specific help on any command, run `nrt <command> --help`.
 
 ---
 
@@ -55,10 +56,10 @@ This document outlines the methodology, findings, and toolkit developed for reco
 
 The project follows a "Binary to Semantic" pipeline to transform flat assembly into architectural insights:
 
-1.  **Structural Scaffolding**: Automated grouping of assembly instructions by class and method using the `scaffolder` tool. This breaks the 1-million-line file into ~1,000 browsable `.cpp` files.
+1.  **Structural Scaffolding**: Automated grouping of assembly instructions by class and method using the `nrt scaffold` command. This breaks the 1-million-line file into ~1,000 browsable `.cpp` files.
 2.  **VTable Discovery**: Identifying the jump-table patterns in constructors to map the virtual function ordering for every class.
 3.  **Semantic Mapping**: Automatically cross-referencing field offsets (e.g., `[r0, #16]`) with official Apple DDK headers to restore original variable names (e.g., `fEnvironment`).
-4.  **Logical Reconstruction**: Manual translation of high-level assembly patterns into clean C++ code, stored in `reconstructed_cpp/`.
+4.  **Logical Reconstruction**: Manual translation of high-level assembly patterns into clean C++ code, stored in `Sources/`.
 
 ---
 
@@ -66,14 +67,14 @@ The project follows a "Binary to Semantic" pipeline to transform flat assembly i
 
 Located in `tools/reconstructor/`, this Go-based suite provides the "brain" for the analysis:
 
-*   **`scaffolder`**: Generates the initial class-based source tree.
-*   **`query`**: A symbolic search engine. It understands "Who calls this virtual method?" and "Who writes to this member variable?"
-*   **`viz`**: Generates Mermaid-format call graphs to visualize subsystem relationships.
-*   **`analyzer`**: Detailed class structural analysis, identifying size, base classes, and field usage patterns.
-*   **`regmap`**: Hardware register (MMIO) semantic mapper.
-*   **`vmap`**: Automated VTable discovery and mapping.
-*   **`atomic`**: Pattern recognizer for atomic hardware transactions.
-*   **`inspector`**: High-performance disassembly navigation and cross-referencing.
+*   **`nrt scaffold`**: Generates the initial class-based source tree.
+*   **`nrt query`**: A symbolic search engine. It understands "Who calls this virtual method?" and "Who writes to this member variable?"
+*   **`nrt viz`**: Generates Mermaid-format call graphs to visualize subsystem relationships.
+*   **`nrt analyze`**: Detailed class structural analysis, identifying size, base classes, and field usage patterns.
+*   **`nrt regmap`**: Hardware register (MMIO) semantic mapper.
+*   **`nrt vmap`**: Automated VTable discovery and mapping.
+*   **`nrt atomic`**: Pattern recognizer for atomic hardware transactions.
+*   **`nrt inspect`**: High-performance disassembly navigation and cross-referencing.
 
 ## 4. Lessons Learned
 

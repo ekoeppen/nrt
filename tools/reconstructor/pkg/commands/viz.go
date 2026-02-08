@@ -1,26 +1,38 @@
-package main
+package commands
 
 import (
-	"flag"
 	"fmt"
 	"log"
+	"strings"
+
 	"newton/reconstructor/pkg/analysis"
 	"newton/reconstructor/pkg/asm"
-	"strings"
+	"github.com/spf13/cobra"
 )
 
-func main() {
-	asmPath := flag.String("asm", "MP2x00US.s", "Path to assembly file")
-	target := flag.String("target", "", "Target class or function to center the graph on")
-	depth := flag.Int("depth", 1, "Graph depth")
-	flag.Parse()
+var (
+	vizTarget string
+	vizDepth  int
+)
 
-	if *target == "" {
-		log.Fatalf("Target is required")
-	}
+var vizCmd = &cobra.Command{
+	Use:   "viz",
+	Short: "Generate Mermaid call graphs",
+	Run: func(cmd *cobra.Command, args []string) {
+		runViz()
+	},
+}
 
-	log.Printf("Loading assembly...")
-	symbols, _, err := asm.ParseFile(*asmPath)
+func init() {
+	vizCmd.Flags().StringVar(&vizTarget, "target", "", "Target class or function to center the graph on")
+	vizCmd.Flags().IntVar(&vizDepth, "depth", 1, "Graph depth")
+	vizCmd.MarkFlagRequired("target")
+	rootCmd.AddCommand(vizCmd)
+}
+
+func runViz() {
+	log.Printf("Loading assembly from %s...", asmPath)
+	symbols, _, err := asm.ParseFile(asmPath)
 	if err != nil {
 		log.Fatalf("Load error: %v", err)
 	}
@@ -30,15 +42,17 @@ func main() {
 	engine.Analyze()
 
 	fmt.Println("graph TD")
-	
+
 	visited := make(map[string]bool)
-	queue := []string{*target}
-	
+	queue := []string{vizTarget}
+
 	// We'll search for callers and callees
-	for d := 0; d < *depth; d++ {
+	for d := 0; d < vizDepth; d++ {
 		nextQueue := []string{}
 		for _, node := range queue {
-			if visited[node] { continue }
+			if visited[node] {
+				continue
+			}
 			visited[node] = true
 
 			// Show callers
@@ -50,7 +64,7 @@ func main() {
 					}
 				}
 			}
-			
+
 			// Show callees (this requires a separate map or scanning)
 			// For now, let's just do callers as it's the most interesting for reverse engineering
 		}

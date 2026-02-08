@@ -1,4 +1,4 @@
-package main
+package commands
 
 import (
 	"bufio"
@@ -7,13 +7,31 @@ import (
 	"path/filepath"
 	"strings"
 	"unicode"
+
+	"github.com/spf13/cobra"
 )
 
-func main() {
-	inFile := "intermediate/globals.cpp"
-	outDir := "intermediate"
+var (
+	splitGlobalsInFile string
+	splitGlobalsOutDir string
+)
 
-	f, err := os.Open(inFile)
+var splitGlobalsCmd = &cobra.Command{
+	Use:   "split-globals",
+	Short: "Split intermediate/globals.cpp into multiple files based on symbol names",
+	Run: func(cmd *cobra.Command, args []string) {
+		runSplitGlobals()
+	},
+}
+
+func init() {
+	splitGlobalsCmd.Flags().StringVar(&splitGlobalsInFile, "in", "intermediate/globals.cpp", "Input globals.cpp file")
+	splitGlobalsCmd.Flags().StringVar(&splitGlobalsOutDir, "out", "intermediate", "Output directory")
+	rootCmd.AddCommand(splitGlobalsCmd)
+}
+
+func runSplitGlobals() {
+	f, err := os.Open(splitGlobalsInFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening file: %v\n", err)
 		os.Exit(1)
@@ -37,7 +55,7 @@ func main() {
 		}
 	}()
 
-	fmt.Println("Starting split of intermediate/globals.cpp...")
+	fmt.Printf("Starting split of %s...\n", splitGlobalsInFile)
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -57,10 +75,6 @@ func main() {
 				parts := strings.SplitN(line, "Symbol: ", 2)
 				if len(parts) > 1 {
 					currentSymbol = strings.TrimSpace(parts[1])
-					// Handle names like "reverse(unsigned char *)" by taking the name part
-					if idx := strings.IndexAny(currentSymbol, " ("); idx != -1 {
-						// But for the first character, it doesn't matter if we take the whole thing
-					}
 				}
 			}
 
@@ -69,13 +83,13 @@ func main() {
 				if currentSymbol != "" {
 					firstChar := rune(currentSymbol[0])
 					bucket := strings.ToLower(string(firstChar))
-					
+
 					if !unicode.IsLetter(firstChar) && firstChar != '_' {
 						bucket = "other"
 					}
 
 					fileName := fmt.Sprintf("globals_%s.cpp", bucket)
-					filePath := filepath.Join(outDir, fileName)
+					filePath := filepath.Join(splitGlobalsOutDir, fileName)
 
 					outF, ok := openedFiles[filePath]
 					if !ok {

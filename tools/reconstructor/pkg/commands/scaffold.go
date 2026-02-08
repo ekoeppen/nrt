@@ -1,7 +1,6 @@
-package main
+package commands
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -13,12 +12,32 @@ import (
 
 	"newton/reconstructor/pkg/asm"
 	"newton/reconstructor/pkg/cpp"
+	"github.com/spf13/cobra"
 )
 
+var (
+	scaffoldOutDir      string
+	scaffoldTargetClass string
+)
+
+var scaffoldCmd = &cobra.Command{
+	Use:   "scaffold",
+	Short: "Generate initial .cpp files from assembly",
+	Run: func(cmd *cobra.Command, args []string) {
+		runScaffold()
+	},
+}
+
+func init() {
+	scaffoldCmd.Flags().StringVar(&scaffoldOutDir, "out", "intermediate", "Output directory")
+	scaffoldCmd.Flags().StringVar(&scaffoldTargetClass, "class", "", "Filter for a specific class")
+	rootCmd.AddCommand(scaffoldCmd)
+}
+
 type ClassMeta struct {
-	VTable  []string
-	Fields  map[uint64]FieldInfo
-	Base    string
+	VTable []string
+	Fields map[uint64]FieldInfo
+	Base   string
 }
 
 type FieldInfo struct {
@@ -28,18 +47,12 @@ type FieldInfo struct {
 	Name   string
 }
 
-func main() {
-	asmPath := flag.String("asm", "MP2x00US.s", "Path to assembly file")
-	headersPath := flag.String("headers", "NCT_Projects", "Path to headers directory")
-	outDir := flag.String("out", "reconstructed_src_v2", "Output directory")
-	targetClass := flag.String("class", "", "Filter for a specific class")
-	flag.Parse()
+func runScaffold() {
+	log.Printf("Scanning headers from %s...", headersPath)
+	classes, _ := cpp.ScanHeaders(headersPath)
 
-	log.Printf("Scanning headers...")
-	classes, _ := cpp.ScanHeaders(*headersPath)
-
-	log.Printf("Parsing assembly...")
-	symbols, allInsts, err := asm.ParseFile(*asmPath)
+	log.Printf("Parsing assembly from %s...", asmPath)
+	symbols, allInsts, err := asm.ParseFile(asmPath)
 	if err != nil {
 		log.Fatalf("Parse error: %v", err)
 	}
@@ -62,7 +75,7 @@ func main() {
 		if name == "" {
 			name = "globals"
 		}
-		if *targetClass != "" && name != *targetClass {
+		if scaffoldTargetClass != "" && name != scaffoldTargetClass {
 			continue
 		}
 		classFunctions[name] = append(classFunctions[name], fn)
@@ -70,9 +83,11 @@ func main() {
 
 	log.Printf("Analyzing classes...")
 	for name, fns := range classFunctions {
-		if name == "globals" { continue }
+		if name == "globals" {
+			continue
+		}
 		meta := &ClassMeta{Fields: make(map[uint64]FieldInfo)}
-		
+
 		// Map header class if available
 		headerClass, found := findClass(name, classes)
 
@@ -99,27 +114,29 @@ func main() {
 				}
 			}
 		}
-		
+
 		classMeta[name] = meta
 	}
 
-	os.MkdirAll(filepath.Join(*outDir, "include"), 0755)
+	os.MkdirAll(filepath.Join(scaffoldOutDir, "include"), 0755)
 
 	for name, fns := range classFunctions {
-		cppPath := filepath.Join(*outDir, name+".cpp")
+		cppPath := filepath.Join(scaffoldOutDir, name+".cpp")
 		f, _ := os.Create(cppPath)
-		
+
 		meta := classMeta[name]
 		header := "Newton.h"
 		c, found := findClass(name, classes)
 		if found {
 			header = c.Path
-			if idx := strings.Index(header, "NCT_Projects/"); idx != -1 {
+			if idx := strings.Index(header, "Includes/"); idx != -1 {
+				header = header[idx+9:]
+			} else if idx := strings.Index(header, "NCT_Projects/"); idx != -1 {
 				header = header[idx+13:]
 			}
 		} else if name != "globals" {
 			header = "include/" + name + ".h"
-			genHeader(filepath.Join(*outDir, header), name, meta, fns)
+			genHeader(filepath.Join(scaffoldOutDir, header), name, meta, fns)
 		}
 
 		fmt.Fprintf(f, "#include \"%s\"\n\n", header)
@@ -138,7 +155,7 @@ func main() {
 		f.Close()
 	}
 
-	writeGlobalData(*outDir, globalData, symbols)
+	writeGlobalData(scaffoldOutDir, globalData, symbols)
 	log.Println("Done.")
 }
 
@@ -176,7 +193,9 @@ func analyzeFunction(fn *asm.Function, meta *ClassMeta, allInsts map[uint64]*asm
 			vtableAddr := uint64(0)
 			for i := len(fn.Instructions) - 1; i >= 0; i-- {
 				prev := fn.Instructions[i]
-				if prev.AddressInt >= inst.AddressInt { continue }
+				if prev.AddressInt >= inst.AddressInt {
+					continue
+				}
 				if prev.Mnemonic == "ldr" && strings.HasPrefix(prev.Args, storedReg+", [pc") {
 					re := regexp.MustCompile(`#(\d+)`)
 					m := re.FindStringSubmatch(prev.Args)
@@ -193,9 +212,13 @@ func analyzeFunction(fn *asm.Function, meta *ClassMeta, allInsts map[uint64]*asm
 			if vtableAddr != 0 && len(meta.VTable) == 0 {
 				for i := uint64(0); i < 400; i += 4 { // Read up to 100 slots
 					vinst, ok := allInsts[vtableAddr+i]
-					if !ok || vinst.Mnemonic != "b" { break }
+					if !ok || vinst.Mnemonic != "b" {
+						break
+					}
 					targetStr := vinst.Args
-					if idx := strings.Index(targetStr, " "); idx != -1 { targetStr = targetStr[:idx] }
+					if idx := strings.Index(targetStr, " "); idx != -1 {
+						targetStr = targetStr[:idx]
+					}
 					targetAddr, _ := strconv.ParseUint(targetStr, 16, 64)
 					if sym, ok := addrToSymbol[targetAddr]; ok {
 						meta.VTable = append(meta.VTable, sym.Name)
@@ -218,7 +241,7 @@ func genHeader(path string, className string, meta *ClassMeta, fns []*asm.Functi
 	} else {
 		fmt.Fprintf(f, "class %s {\npublic:\n", className)
 	}
-	
+
 	seen := make(map[string]bool)
 	var methods []string
 	for _, fn := range fns {
@@ -239,7 +262,9 @@ func genHeader(path string, className string, meta *ClassMeta, fns []*asm.Functi
 
 	fmt.Fprintf(f, "\nprotected:\n")
 	var offsets []uint64
-	for off := range meta.Fields { offsets = append(offsets, off) }
+	for off := range meta.Fields {
+		offsets = append(offsets, off)
+	}
 	sort.Slice(offsets, func(i, j int) bool { return offsets[i] < offsets[j] })
 	for _, off := range offsets {
 		field := meta.Fields[off]
@@ -301,7 +326,9 @@ func writeFunction(f *os.File, fn *asm.Function, className string, c *cpp.Class,
 }
 
 func writeGlobalData(outDir string, globalData []*asm.Function, symbols []*asm.Function) {
-	if len(globalData) == 0 { return }
+	if len(globalData) == 0 {
+		return
+	}
 	f, _ := os.Create(filepath.Join(outDir, "global_data.cpp"))
 	h, _ := os.Create(filepath.Join(outDir, "include/global_data.h"))
 	defer f.Close()
@@ -321,7 +348,9 @@ func writeGlobalData(outDir string, globalData []*asm.Function, symbols []*asm.F
 		fmt.Fprintf(h, "extern unsigned char %s[%d];\n", item.Name, size)
 		fmt.Fprintf(f, "unsigned char %s[%d] = {", item.Name, size)
 		for j, inst := range item.Instructions {
-			if j % 4 == 0 { fmt.Fprintf(f, "\n    ") }
+			if j%4 == 0 {
+				fmt.Fprintf(f, "\n    ")
+			}
 			if len(inst.Opcode) == 8 {
 				fmt.Fprintf(f, "0x%s, 0x%s, 0x%s, 0x%s, ", inst.Opcode[6:8], inst.Opcode[4:6], inst.Opcode[2:4], inst.Opcode[0:2])
 			}
@@ -332,7 +361,9 @@ func writeGlobalData(outDir string, globalData []*asm.Function, symbols []*asm.F
 }
 
 func extractClassName(fn *asm.Function) string {
-	if fn.ClassName != "" { return fn.ClassName }
+	if fn.ClassName != "" {
+		return fn.ClassName
+	}
 	if strings.Contains(fn.Name, "::") {
 		return strings.Split(fn.Name, "::")[0]
 	}
@@ -343,26 +374,42 @@ func extractMethodName(fn *asm.Function, className string) string {
 	method := ""
 	if strings.Contains(fn.Name, "::") {
 		method = strings.Split(fn.Name, "::")[1]
-		if idx := strings.Index(method, "("); idx != -1 { method = method[:idx] }
+		if idx := strings.Index(method, "("); idx != -1 {
+			method = method[:idx]
+		}
 	} else if idx := strings.Index(fn.Name, "__"); idx != -1 {
 		method = fn.Name[:idx]
 	} else {
 		method = fn.Name
 	}
 	method = strings.TrimPrefix(method, "$")
-	if method == "__ct" { return className }
-	if method == "__dt" { return "~" + className }
+	if method == "__ct" {
+		return className
+	}
+	if method == "__dt" {
+		return "~" + className
+	}
 	return method
 }
 
 func findClass(name string, classes map[string]*cpp.Class) (*cpp.Class, bool) {
-	if c, ok := classes[name]; ok { return c, true }
+	if c, ok := classes[name]; ok {
+		return c, true
+	}
 	if strings.HasPrefix(name, "T") {
 		base := name[1:]
-		if c, ok := classes["TU"+base]; ok { return c, true }
-		if c, ok := classes[base]; ok { return c, true }
+		if c, ok := classes["TU"+base]; ok {
+			return c, true
+		}
+		if c, ok := classes[base]; ok {
+			return c, true
+		}
 	}
-	if c, ok := classes["T"+name]; ok { return c, true }
-	if c, ok := classes["TU"+name]; ok { return c, true }
+	if c, ok := classes["T"+name]; ok {
+		return c, true
+	}
+	if c, ok := classes["TU"+name]; ok {
+		return c, true
+	}
 	return nil, false
 }

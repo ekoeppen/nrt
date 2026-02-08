@@ -1,23 +1,38 @@
-package main
+package commands
 
 import (
-	"flag"
 	"fmt"
 	"log"
+	"strconv"
+	"strings"
+
 	"newton/reconstructor/pkg/analysis"
 	"newton/reconstructor/pkg/asm"
-	"strings"
-	"strconv"
+	"github.com/spf13/cobra"
 )
 
-func main() {
-	asmPath := flag.String("asm", "MP2x00US.s", "Path to assembly file")
-	calleesOf := flag.String("callees-of", "", "Show who calls this function")
-	accessorsOf := flag.String("accessors-of", "", "Show who accesses Class:Offset (e.g. TSharedMem:4)")
-	flag.Parse()
+var (
+	queryCalleesOf   string
+	queryAccessorsOf string
+)
 
-	log.Printf("Loading assembly...")
-	symbols, _, err := asm.ParseFile(*asmPath)
+var queryCmd = &cobra.Command{
+	Use:   "query",
+	Short: "Symbolic search for callers and field access",
+	Run: func(cmd *cobra.Command, args []string) {
+		runQuery()
+	},
+}
+
+func init() {
+	queryCmd.Flags().StringVar(&queryCalleesOf, "callees-of", "", "Show who calls this function")
+	queryCmd.Flags().StringVar(&queryAccessorsOf, "accessors-of", "", "Show who accesses Class:Offset (e.g. TSharedMem:4)")
+	rootCmd.AddCommand(queryCmd)
+}
+
+func runQuery() {
+	log.Printf("Loading assembly from %s...", asmPath)
+	symbols, _, err := asm.ParseFile(asmPath)
 	if err != nil {
 		log.Fatalf("Load error: %v", err)
 	}
@@ -26,12 +41,12 @@ func main() {
 	engine := analysis.NewEngine(symbols)
 	engine.Analyze()
 
-	if *calleesOf != "" {
-		fmt.Printf("Callers of %s:\n", *calleesOf)
-		callers := engine.Callers[*calleesOf]
+	if queryCalleesOf != "" {
+		fmt.Printf("Callers of %s:\n", queryCalleesOf)
+		callers := engine.Callers[queryCalleesOf]
 		if len(callers) == 0 {
 			for name, c := range engine.Callers {
-				if strings.Contains(name, *calleesOf) {
+				if strings.Contains(name, queryCalleesOf) {
 					fmt.Printf("--- From fuzzy match: %s ---\n", name)
 					printFunctions(c)
 				}
@@ -41,8 +56,8 @@ func main() {
 		}
 	}
 
-	if *accessorsOf != "" {
-		parts := strings.Split(*accessorsOf, ":")
+	if queryAccessorsOf != "" {
+		parts := strings.Split(queryAccessorsOf, ":")
 		if len(parts) != 2 {
 			log.Fatalf("Invalid format for accessors-of. Use Class:Offset")
 		}

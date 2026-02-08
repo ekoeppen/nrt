@@ -1,0 +1,30 @@
+version: '3'
+
+vars:
+  NRT_DIR: tools/reconstructor
+
+tasks:
+  build:
+    desc: Build the Newton Reconstruction Toolkit (nrt)
+    cmds:
+      - cd {{.NRT_DIR}} && go build -o nrt ./cmd/nrt
+
+  install:
+    desc: Install the nrt tool to /tools/bin
+    cmds:
+      - cd {{.NRT_DIR}} && go install ./cmd/nrt
+      - echo "nrt installed to $(go env GOBIN)"
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -f {{.NRT_DIR}}/nrt
+
+  test:
+    desc: Run tests for the reconstructor
+    cmds:
+      - cd {{.NRT_DIR}} && go test ./...
+
+  default:
+    cmds:
+      - task: build

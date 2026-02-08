@@ -1,28 +1,42 @@
-package main
+package commands
 
 import (
-	"flag"
 	"fmt"
 	"log"
+
 	"newton/reconstructor/pkg/analysis"
 	"newton/reconstructor/pkg/asm"
+	"github.com/spf13/cobra"
 )
 
-func main() {
-	asmPath := flag.String("asm", "MP2x00US.s", "Path to assembly file")
-	className := flag.String("class", "", "Class name to analyze")
-	flag.Parse()
+var (
+	atomicClassName string
+)
 
-	log.Printf("Loading assembly...")
-	functions, _, err := asm.ParseFile(*asmPath)
+var atomicCmd = &cobra.Command{
+	Use:   "atomic",
+	Short: "Pattern recognizer for atomic hardware transactions",
+	Run: func(cmd *cobra.Command, args []string) {
+		runAtomic()
+	},
+}
+
+func init() {
+	atomicCmd.Flags().StringVar(&atomicClassName, "class", "", "Class name to analyze")
+	rootCmd.AddCommand(atomicCmd)
+}
+
+func runAtomic() {
+	log.Printf("Loading assembly from %s...", asmPath)
+	functions, _, err := asm.ParseFile(asmPath)
 	if err != nil {
 		log.Fatalf("Load error: %v", err)
 	}
 
 	fmt.Printf("\n=== Atomic Transaction Analysis ===\n")
-	
+
 	for _, fn := range functions {
-		if *className != "" && fn.ClassName != *className {
+		if atomicClassName != "" && fn.ClassName != atomicClassName {
 			continue
 		}
 
