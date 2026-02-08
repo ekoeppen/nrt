@@ -1,10 +1,13 @@
 # Newton OS ROM Reverse Engineering Project
 
-This project aims at reconstrucing the NewtonOS sources from the ROM listing in MP2x00.s and the header files in NCT_Projects.
+This project aims at reconstrucing the NewtonOS sources from the ROM listing in MP2x00.s and the header files in `Includes`.
+The header files are further subdivided into `OS` for the operating system headers, and `NCT` for user space C++ headers.
 
-The intermediate sources are under `intermediate`, and the reverse engineered sources under `final`.
+The intermediate sources are under `intermediate`, and the reverse engineered sources under `Sources`.
+The header files in `Includes/OS` will be gradually expanded to cover missing headers.
 
-More information about the NewtonOS internals can be found here: https://40hz.org/Pages/newton/hacking/newtonos-internals/
+More information about the NewtonOS internals can be found here: https://40hz.org/Pages/newton/hacking/newtonos-internals/,
+as well as in the [background](docs/the_newton_os.txt) document.
 
 ## Toolkit Quick-Reference Guide
 
