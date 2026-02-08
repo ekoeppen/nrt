@@ -194,3 +194,94 @@ func extractTarget(args string) string {
 	}
 	return ""
 }
+
+type AtomicBlock struct {
+	StartAddr uint64
+	EndAddr   uint64
+	Instructions []asm.Instruction
+}
+
+func FindAtomicBlocks(f *asm.Function) []AtomicBlock {
+	var blocks []AtomicBlock
+	var currentBlock *AtomicBlock
+	
+	for _, inst := range f.Instructions {
+		if strings.Contains(inst.Raw, "bl") && strings.Contains(inst.Raw, "EnterAtomic") {
+			currentBlock = &AtomicBlock{StartAddr: inst.AddressInt}
+			continue
+		}
+		
+		if currentBlock != nil {
+			if strings.Contains(inst.Raw, "bl") && strings.Contains(inst.Raw, "ExitAtomic") {
+				currentBlock.EndAddr = inst.AddressInt
+				blocks = append(blocks, *currentBlock)
+				currentBlock = nil
+			} else {
+				currentBlock.Instructions = append(currentBlock.Instructions, inst)
+			}
+		}
+	}
+	
+	return blocks
+}
+
+func FindVTableAddr(f *asm.Function) uint64 {
+	// Look for: ldr rX, [pc, #offset]; ...; str rX, [r0]
+	// where r0 is usually the 'this' pointer in a constructor.
+	
+	var vtableAddr uint64
+	var lastLdrValue uint64
+	var lastLdrReg string
+
+	for _, inst := range f.Instructions {
+		// Detect ldr rX, [pc, #offset]
+		if inst.Mnemonic == "ldr" {
+			parts := strings.Split(inst.Args, ",")
+			if len(parts) >= 2 {
+				reg := strings.TrimSpace(parts[0])
+				target := strings.TrimSpace(parts[1])
+				if strings.Contains(target, "[pc") {
+					// It's a PC-relative load, usually from a literal pool
+					// We need to look at the comment or raw to find the actual value
+					re := regexp.MustCompile(`; ([0-9a-fA-F]+)`)
+					match := re.FindStringSubmatch(inst.Raw)
+					if len(match) > 1 {
+						val, _ := strconv.ParseUint(match[1], 16, 64)
+						lastLdrValue = val
+						lastLdrReg = reg
+					}
+				}
+			}
+		}
+		
+		// Detect str rX, [r0] (or [r4] if this was moved)
+		if inst.Mnemonic == "str" {
+			parts := strings.Split(inst.Args, ",")
+			if len(parts) >= 2 {
+				srcReg := strings.TrimSpace(parts[0])
+				dst := strings.TrimSpace(parts[1])
+				if (dst == "[r0]" || dst == "[r4]") && srcReg == lastLdrReg {
+					vtableAddr = lastLdrValue
+				}
+			}
+		}
+	}
+	
+	return vtableAddr
+}
+
+func (c *ClassMetadata) ExtractVTable(symbols map[uint64]*asm.Function) []string {
+	var methods []string
+	addr := c.VTableAddr
+	
+	for {
+		sym, ok := symbols[addr]
+		if !ok || sym.Type != asm.TypeFunction {
+			break
+		}
+		methods = append(methods, sym.DemangledName)
+		addr += 4
+	}
+	
+	return methods
+}

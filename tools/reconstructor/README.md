@@ -46,6 +46,48 @@ Performs deep structural analysis of a class.
 go run cmd/analyzer/main.go -asm ../../MP2x00US.s -class "CBufferList"
 ```
 
+### 5. Register Mapper (`cmd/regmap`)
+Scans for MMIO constants and maps them to hardware register names.
+- **MMIO Discovery**: Identifies constants in the `0xF...` and `0x1...` ranges.
+- **DDK Mapping**: Correlates addresses with known Newton register definitions.
+
+```bash
+go run cmd/regmap/main.go -asm ../../MP2x00US.s -class "TBIOInterface"
+```
+
+### 6. VTable Mapper (`cmd/vmap`)
+Reconstructs the virtual function table (VTable) for a specific class.
+- **Constructor Analysis**: Traces the VTable pointer initialization in the constructor.
+- **Method Enumeration**: Dumps the ordered list of virtual methods (slots) for the class.
+
+```bash
+go run cmd/vmap/main.go -asm ../../MP2x00US.s -class "TDelayTimer"
+```
+
+### 7. Atomic Analyzer (`cmd/atomic`)
+Identifies and displays critical sections protected by atomic operations.
+- **Transaction View**: Groups instructions between `EnterAtomic` and `ExitAtomic`.
+- **Logic Isolation**: Helps in reconstructing clean hardware read-modify-write logic.
+
+```bash
+go run cmd/atomic/main.go -asm ../../MP2x00US.s -class "TBIOInterface"
+```
+
+### 8. Inspector (`cmd/inspector`)
+An interactive navigation and cross-reference tool for the ROM.
+- **`lookup`**: Find functions by name or regex.
+- **`xref`**: Find all calls to a specific address or symbol.
+- **`body`**: Extract the full implementation of a function.
+- **`range`**: Dump disassembly for a specific address range.
+
+```bash
+# Find all references to TBIOInterface::WaitBIOStatus
+go run cmd/inspector/main.go -cmd xref -target "TBIOInterface::WaitBIOStatus"
+
+# Dump the implementation of TDelayTimer::ShortTimerDelay
+go run cmd/inspector/main.go -cmd body -target "TDelayTimer::ShortTimerDelay"
+```
+
 ## Usage in Workflow
 
 1.  **Generate Project**: Run `scaffolder` once to create the browsable source code.

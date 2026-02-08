@@ -157,3 +157,16 @@ The following classes have been fully reverse engineered from ARM assembly to hi
     *   `TClassInfo` (48 bytes) provides meta-information for protocols, including offsets to implementation names, interface names, and entry points for monitors.
     *   The protocol dispatch mechanism uses ARM branch instructions directly in the `BTable` for high-speed calls.
 *   **Methodology**: Analyzed the self-relative offset (SRO) pattern in `TClassInfo` for name and table resolution. Reconstructed the `StartMonitor` and `DestroyMonitor` lifecycle methods which bridge the protocol and monitor systems.
+
+### **HAL Subsystem: Phase 1 (Foundation I/O)**
+*   **Status**: Fundamental hardware interface classes reconstructed.
+*   **Classes Reconstructed**:
+    *   `TDelayTimer`: Microsecond busy-waits and timeouts using Timer0.
+    *   `TBankControlRegister`: Flash bank data size and lane width configuration.
+    *   `TBIOInterface`: Interface for the Keynes/Voyager bus I/O ASIC.
+    *   `TGPIOInterface`: General Purpose I/O management with interrupt routing.
+    *   `TRealTimeClock`: RTC management and system alarm handling (16 slots).
+*   **Architectural Insights**:
+    *   HAL classes use a "Configuration Entry" system (`GetLastRExConfigEntry`) to map logical functions to hardware bits, allowing for platform flexibility.
+    *   Atomic operations (`EnterAtomic`/`ExitAtomic`) are heavily used for register read-modify-write cycles.
+    *   Register mapping follows a consistent `0x400` byte stride for sub-modules within the ASICs.

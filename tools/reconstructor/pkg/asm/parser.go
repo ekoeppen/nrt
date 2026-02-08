@@ -120,7 +120,14 @@ func inferType(name string) SymbolType {
 	return TypeFunction
 }
 
+func demangle(name string) string {
+	d := name
+	d = strings.ReplaceAll(d, "$", "")
+	return d
+}
+
 func parseName(fn *Function) {
+	fn.DemangledName = demangle(fn.Name)
 	if strings.Contains(fn.Name, "::") {
 		parts := strings.Split(fn.Name, "::")
 		fn.ClassName = parts[0]

@@ -23,6 +23,10 @@ Use this guide to select the right tool for each reconstruction scenario.
 | **Find who calls a specific method** | `query` | Performs a symbolic search for all caller functions. |
 | **Find who writes to a specific field** | `query` | Search for all accessors of a specific `Class:Offset`. |
 | **Visualize subsystem dependencies** | `viz` | Generates a Mermaid-format call graph for architectural mapping. |
+| **Identify hardware registers (MMIO)** | `regmap` | Maps hex addresses (e.g., `0xF0050000`) to official register names. |
+| **Map a class VTable (all slots)** | `vmap` | Traces constructors to build the complete, ordered virtual method map. |
+| **Analyze critical hardware sections** | `atomic` | Groups code within `EnterAtomic` blocks to reveal register logic. |
+| **Find symbols or cross-references** | `inspector` | Fast, indexed lookup of function bodies and global call-sites. |
 
 ### **General Usage Instructions**
 
@@ -38,7 +42,7 @@ All tools are located in `tools/reconstructor/` and can be run using `go run`.
    go run cmd/<tool_name>/main.go -asm ../../MP2x00US.s [options]
    ```
 
-*   **`<tool_name>`**: Use `scaffolder`, `analyzer`, `vcall`, `query`, or `viz`.
+*   **`<tool_name>`**: Use `scaffolder`, `analyzer`, `vcall`, `query`, `viz`, `regmap`, `vmap`, `atomic`, or `inspector`.
 *   **`-asm`**: Path to the 42MB disassembly file (relative to the tool directory).
 
 For specific help on any tool, run it without arguments or with `-h`.
@@ -66,6 +70,10 @@ Located in `tools/reconstructor/`, this Go-based suite provides the "brain" for 
 *   **`query`**: A symbolic search engine. It understands "Who calls this virtual method?" and "Who writes to this member variable?"
 *   **`viz`**: Generates Mermaid-format call graphs to visualize subsystem relationships.
 *   **`analyzer`**: Detailed class structural analysis, identifying size, base classes, and field usage patterns.
+*   **`regmap`**: Hardware register (MMIO) semantic mapper.
+*   **`vmap`**: Automated VTable discovery and mapping.
+*   **`atomic`**: Pattern recognizer for atomic hardware transactions.
+*   **`inspector`**: High-performance disassembly navigation and cross-referencing.
 
 ## 4. Lessons Learned
 
@@ -144,3 +152,52 @@ Complex orchestrators and memory management.
 *   [ ] `TObjectTable`
 *   [ ] `TObjectReader`
 *   [ ] `TObjectWriter`
+
+### **HAL Subsystem Coverage Plan**
+
+Follow this order to build a solid hardware abstraction foundation:
+
+#### **Phase 1: Fundamental Hardware I/O**
+Low-level interfaces for register access and basic hardware state.
+*   [x] `TBIOInterface` (Bus I/O)
+*   [x] `TGPIOInterface` (General Purpose I/O)
+*   [x] `TDelayTimer` (Low-level polling and short delays)
+*   [x] `TRealTimeClock` (RTC management)
+*   [x] `TBankControlRegister` (Memory banking)
+
+#### **Phase 2: Timers & Interrupt Support**
+The infrastructure for event-driven hardware interaction.
+*   [ ] `TTimerElement` / `TTimerEngine` / `TTimerQueue`
+*   [ ] `TFIQTimer` (Fast Interrupt timers)
+*   [ ] `TIRQTimer` (Standard Interrupt timers)
+*   [ ] `TTimerPort`
+
+#### **Phase 3: Data Transport & Serial I/O**
+Moving data between memory and external interfaces.
+*   [ ] `TDMAChannel`
+*   [ ] `TDMAManager`
+*   [ ] `TSerialChip` (Base class)
+*   [ ] `TSerialChip16450` (Standard UART)
+*   [ ] `TSerialChipVoyager` (MP2k-specific UART)
+
+#### **Phase 4: Input/Output & Power Drivers**
+Core human-interface and system power logic.
+*   [ ] `TADC` (Analog-to-Digital Converter)
+*   [ ] `TResistiveTablet` (Touch screen input)
+*   [ ] `TScreenDriver` (Display/LCD control)
+*   [ ] `TPowerManager` / `TPowerEventHandler`
+
+#### **Phase 5: Platform & PCMCIA Management**
+Hardware-specific implementations for the MessagePad 2000 (Voyager platform).
+*   [ ] `TPlatformDriver`
+*   [ ] `TVoyagerPlatform` (Concrete platform implementation)
+*   [ ] `TCardPCMCIA` (PC Card bus)
+*   [ ] `TCardSocket` (Socket management)
+*   [ ] `TPCMCIA20Parser` (CIS parsing)
+
+#### **Phase 6: MMU & Memory Layout**
+Hardware-level memory protection and translation.
+*   [ ] `TUPageManager`
+*   [ ] `TPageTableManager`
+*   [ ] `TPageTracker`
+*   [ ] `TExtPageTracker`
