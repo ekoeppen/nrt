@@ -129,7 +129,7 @@ The implementation of the OS objects themselves.
 *   [x] `TUTaskWorld`
 *   [ ] `TPort`
 *   [x] `TUPort`
-*   [ ] `TDomain`
+*   [x] `TKDomain` (listed as `TDomain`)
 *   [ ] `TMonitor`
 *   [ ] `TSystemEvent`
 *   [ ] `TProtocol`

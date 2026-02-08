@@ -133,3 +133,11 @@ The following classes have been fully reverse engineered from ARM assembly to hi
     *   Implements a virtual VTable: `~TUTaskWorld`, `GetSizeOf`, `TaskConstructor`, `TaskDestructor`, `TaskMain`.
     *   Automatically deletes itself in the child task context upon completion.
 *   **Methodology**: Analyzed constructor offsets to map `fMotherPort` and `fChildTask`. Reconstructed `StartTask` and `TaskEntry` logic from assembly patterns for NewtonOS task lifecycle management.
+
+### **TKDomain Reconstruction**
+*   **Status**: Completed.
+*   **Findings**:
+    *   `TKDomain` (36 bytes) is the kernel-side primitive for memory domains.
+    *   Manages address range (`fBase`, `fSize`), domain IDs (`fDomainNumber`), and fault monitors.
+    *   Integrates with `TMemArchManager` for range management and `InitDomainPrimaryTable` for hardware MMU setup.
+*   **Methodology**: Identified kernel addresses (`0xaf040`) for domain primitives. Mapped internal offsets for base address and size tracking. Reconstructed range intersection logic and fault monitor registration.
