@@ -139,7 +139,7 @@ Complex orchestrators and memory management.
 *   [ ] `TObjectManager`
 *   [ ] `TObjectHeap`
 *   [ ] `TNameServer`
-*   [ ] `TUNameServer`
+*   [x] `TUNameServer`
 *   [ ] `TUDomainManager`
 *   [ ] `TObjectTable`
 *   [ ] `TObjectReader`

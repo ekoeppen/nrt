@@ -114,3 +114,13 @@ The following classes have been fully reverse engineered from ARM assembly to hi
     *   `TURdWrSemaphore` uses two internal semaphores managed by the kernel group to implement reader-writer semantics.
 *   **Methodology Improvement**: Identified the use of Object Type 4 (Op List) and 5 (Group) in `TUObject::MakeObject` calls.
 
+### **Name Server Interface: `TUNameServer`**
+*   **Status**: Fully reconstructed.
+*   **Findings**:
+    *   `TUNameServer` (16 bytes) is a user-space proxy that communicates with the system NameServer (Port 2).
+    *   It manages two `TUSharedMem` objects (`fMsgName`, `fMsgType`) to pass string parameters (name and type) to the kernel.
+    *   Most operations (`RegisterName`, `Lookup`, etc.) follow a standard pattern: set up shared memory buffers, populate a `TNameRequest` structure, and perform a synchronous RPC via `fNameServerPort.SendRPC`.
+    *   It includes support for Resource Arbitration (Claim/Unclaim) which uses the `TResArbitrationRequest` extension.
+*   **Methodology Improvement**: Confirmed that `TUObject` (and its derivatives like `TUPort`) are 8 bytes in size and do NOT have a VTable if they only have non-virtual methods, with `fId` at offset 0 and `fObjectCreatedByUs` at offset 4.
+
+
