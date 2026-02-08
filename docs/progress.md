@@ -141,3 +141,11 @@ The following classes have been fully reverse engineered from ARM assembly to hi
     *   Manages address range (`fBase`, `fSize`), domain IDs (`fDomainNumber`), and fault monitors.
     *   Integrates with `TMemArchManager` for range management and `InitDomainPrimaryTable` for hardware MMU setup.
 *   **Methodology**: Identified kernel addresses (`0xaf040`) for domain primitives. Mapped internal offsets for base address and size tracking. Reconstructed range intersection logic and fault monitor registration.
+
+### **TSystemEvent Reconstruction**
+*   **Status**: Completed.
+*   **Findings**:
+    *   `TSystemEvent` (12 bytes) manages registration for system-wide events via the NameServer.
+    *   `TSendSystemEvent` (44 bytes) inherits from `TSystemEvent` and adds a `TUSharedMemMsg` for sending event data.
+    *   Communicates with the NameServer port (ID 2) using `TSysEventRequest` messages.
+*   **Methodology**: Mapped `TSysEventRequest` field offsets. Verified class inheritance and member placement for `TSendSystemEvent` (offset 12 for the shared memory message).

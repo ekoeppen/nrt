@@ -131,7 +131,7 @@ The implementation of the OS objects themselves.
 *   [x] `TUPort`
 *   [x] `TKDomain` (listed as `TDomain`)
 *   [ ] `TMonitor`
-*   [ ] `TSystemEvent`
+*   [x] `TSystemEvent`
 *   [ ] `TProtocol`
 
 #### **Phase 4: System Management & Infrastructure**
