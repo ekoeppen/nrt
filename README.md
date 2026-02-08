@@ -178,7 +178,7 @@ Moving data between memory and external interfaces.
 *   [ ] `TDMAChannel`
 *   [ ] `TDMAManager`
 *   [x] `TSerialChip` (Base class protocol)
-*   [ ] `TSerialChip16450` (Standard UART)
+*   [x] `TSerialChip16450` (Standard UART)
 *   [x] `TSerialChipVoyager` (MP2k-specific UART)
 
 #### **Phase 4: Input/Output & Power Drivers**
@@ -190,7 +190,7 @@ Core human-interface and system power logic.
 
 #### **Phase 5: Platform & PCMCIA Management**
 Hardware-specific implementations for the MessagePad 2000 (Voyager platform).
-*   [ ] `TPlatformDriver`
+*   [x] `TPlatformDriver`
 *   [ ] `TVoyagerPlatform` (Concrete platform implementation)
 *   [ ] `TCardPCMCIA` (PC Card bus)
 *   [ ] `TCardSocket` (Socket management)
@@ -202,3 +202,38 @@ Hardware-level memory protection and translation.
 *   [ ] `TPageTableManager`
 *   [ ] `TPageTracker`
 *   [ ] `TExtPageTracker`
+
+### **CommAPI Subsystem Coverage Plan**
+
+Follow this order to rebuild the communications stack:
+
+#### **Phase 1: Foundation & Options**
+The configuration backbone for all CommAPI objects.
+*   [x] `TOption`
+*   [x] `TOptionExtended`
+*   [x] `TOptionArray`
+*   [x] `TOptionIterator`
+*   [x] `TSubArrayOption`
+*   [ ] `TCMOTransportInfo`
+*   [ ] `TCMOEndpointName`
+*   [ ] `TCMOServiceIdentifier`
+
+#### **Phase 2: Addressing**
+Specialized classes for various network and telephony protocols.
+*   [ ] `TCMAAppleTalkAddr`
+*   [ ] `TCMANamedAppleTalkAddr`
+*   [ ] `TCMAPhoneNumber`
+*   [ ] `TCMARouteAddress`
+
+#### **Phase 3: Service Management**
+Infrastructure for managing communication services and asynchronous messages.
+*   [ ] `TCMService`
+*   [ ] `TServiceInfo`
+*   [ ] `TAsyncServiceMessage`
+
+#### **Phase 4: Endpoints & Event Handling**
+The primary client-facing API and the asynchronous event model.
+*   [ ] `TEndpoint`
+*   [ ] `TAEvent`
+*   [ ] `TAEventHandler`
+*   [ ] `TEndpointEventHandler`
