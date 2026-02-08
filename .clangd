@@ -1,0 +1,29 @@
+CompileFlags:
+  Add: [
+    "-IIncludes/OS",
+    "-IIncludes/OS/Bootstrap",
+    "-IIncludes/OS/CLibrary",
+    "-IIncludes/OS/CommAPI",
+    "-IIncludes/OS/Communications",
+    "-IIncludes/OS/Frames",
+    "-IIncludes/OS/HAL",
+    "-IIncludes/OS/Lantern",
+    "-IIncludes/OS/OS600",
+    "-IIncludes/OS/PCMCIA",
+    "-IIncludes/OS/PSS",
+    "-IIncludes/OS/Packages",
+    "-IIncludes/OS/Power",
+    "-IIncludes/OS/Printing",
+    "-IIncludes/OS/QD",
+    "-IIncludes/OS/Toolbox",
+    "-IIncludes/OS/UtilityClasses",
+    "-IIncludes/NCT",
+    "-ISources",
+    "-std=c++11",
+    "-Wno-everything",
+    "-D__arm__",
+    "-fparse-all-comments"
+  ]
+
+Index:
+  Background: Build
