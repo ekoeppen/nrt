@@ -83,3 +83,64 @@ Located in `tools/reconstructor/`, this Go-based suite provides the "brain" for 
 
 General principle: Start with leaf classes which have no or few outgoing dependencies, then work up.
 
+
+### **OS600 Subsystem Coverage Plan**
+
+Follow this order to minimize unresolved dependencies during reconstruction:
+
+#### **Phase 1: Foundation & Utility Classes**
+Simple leaf classes with minimal internal logic or external dependencies.
+*   [x] `TDoubleQItem`
+*   [x] `TTaskQItem`
+*   [x] `TSingleQContainer`
+*   [x] `TSharedMem`
+*   [x] `TSemaphoreOpList`
+*   [x] `TUSemaphoreOpList`
+*   [x] `TNameServerRequest`
+*   [x] `TNameRequest`
+*   [x] `TNameServerReply`
+*   [x] `TSysEventRequest`
+*   [x] `TGestaltRequest`
+*   [x] `TResArbitrationRequest`
+*   [x] `TUObject`
+
+#### **Phase 2: User-Level OS Objects**
+Classes that wrap kernel primitives for user-mode tasks.
+*   [x] `TUSemaphoreGroup`
+*   [x] `TULockingSemaphore`
+*   [x] `TURdWrSemaphore`
+*   [x] `TUSharedMem`
+*   [x] `TUSharedMemMsg`
+*   [x] `TUMonitor`
+*   [x] `TUMsgToken`
+*   [x] `TUDomain`
+*   [x] `TUPhys`
+*   [x] `TUGestalt`
+*   [x] `TURealTimeAlarm`
+*   [x] `TUEnvironment`
+
+#### **Phase 3: Core Kernel Primitives**
+The implementation of the OS objects themselves.
+
+*   [ ] `TSemaphore`
+*   [ ] `TSemaphoreGroup`
+*   [ ] `TTask`
+*   [x] `TUTask`
+*   [ ] `TUTaskWorld`
+*   [ ] `TPort`
+*   [x] `TUPort`
+*   [ ] `TDomain`
+*   [ ] `TMonitor`
+*   [ ] `TSystemEvent`
+*   [ ] `TProtocol`
+
+#### **Phase 4: System Management & Infrastructure**
+Complex orchestrators and memory management.
+*   [ ] `TObjectManager`
+*   [ ] `TObjectHeap`
+*   [ ] `TNameServer`
+*   [ ] `TUNameServer`
+*   [ ] `TUDomainManager`
+*   [ ] `TObjectTable`
+*   [ ] `TObjectReader`
+*   [ ] `TObjectWriter`
