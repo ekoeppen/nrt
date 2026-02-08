@@ -167,10 +167,10 @@ Low-level interfaces for register access and basic hardware state.
 
 #### **Phase 2: Timers & Interrupt Support**
 The infrastructure for event-driven hardware interaction.
-*   [ ] `TTimerElement` / `TTimerEngine` / `TTimerQueue`
+*   [x] `TTimerElement` / `TTimerEngine` / `TTimerQueue`
 *   [ ] `TFIQTimer` (Fast Interrupt timers)
 *   [ ] `TIRQTimer` (Standard Interrupt timers)
-*   [ ] `TTimerPort`
+*   [x] `TTimerPort`
 
 #### **Phase 3: Data Transport & Serial I/O**
 Moving data between memory and external interfaces.
