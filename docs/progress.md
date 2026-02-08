@@ -124,3 +124,12 @@ The following classes have been fully reverse engineered from ARM assembly to hi
 *   **Methodology Improvement**: Confirmed that `TUObject` (and its derivatives like `TUPort`) are 8 bytes in size and do NOT have a VTable if they only have non-virtual methods, with `fId` at offset 0 and `fObjectCreatedByUs` at offset 4.
 
 
+
+### **TUTaskWorld Reconstruction**
+*   **Status**: Completed.
+*   **Findings**:
+    *   `TUTaskWorld` (24 bytes) manages task spawning and synchronization between parent and child contexts.
+    *   Uses a `TUPort` (mother port) for inter-task communication during initialization and cleanup.
+    *   Implements a virtual VTable: `~TUTaskWorld`, `GetSizeOf`, `TaskConstructor`, `TaskDestructor`, `TaskMain`.
+    *   Automatically deletes itself in the child task context upon completion.
+*   **Methodology**: Analyzed constructor offsets to map `fMotherPort` and `fChildTask`. Reconstructed `StartTask` and `TaskEntry` logic from assembly patterns for NewtonOS task lifecycle management.

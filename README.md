@@ -126,7 +126,7 @@ The implementation of the OS objects themselves.
 *   [x] `TSemaphoreGroup`
 *   [ ] `TTask`
 *   [x] `TUTask`
-*   [ ] `TUTaskWorld`
+*   [x] `TUTaskWorld`
 *   [ ] `TPort`
 *   [x] `TUPort`
 *   [ ] `TDomain`
