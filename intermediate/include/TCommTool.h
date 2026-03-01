@@ -1,176 +1,263 @@
 #ifndef __INFERRED_TCOMMTOOL_H
 #define __INFERRED_TCOMMTOOL_H
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  MsgContainer  —  per-channel IPC request slot (7 channels × 24 bytes)
+//
+//  Confirmed from CompleteRequest assembly:
+//    r6 = this + ch * 24          (base pointer into array)
+//    ldrb [r6, #BASE]             (pending flag; BASE = 0x94 for TCommTool,
+//                                                    BASE = 0x44 for TConnectionEnd)
+//    i.e. container[ch].fPending = *(arrayBase + ch * 24 + 0)
+//
+//  Sub-offsets within each 24-byte slot:
+//    +0x00  fPending    (UChar) — set to 1 when a request arrives in TaskMain,
+//                                 cleared to 0 in CompleteRequest
+//    +0x04  fReqType    (long)  — copy of the request type / fField48 tag
+//    +0x08  fMsgToken[4](long[4]) — 16-byte TUMsgToken copy from receive buffer
+//
+//  Total stride = 24 (0x18).
+// ─────────────────────────────────────────────────────────────────────────────
+struct MsgContainer {
+    UChar   fPending;           // +0x00  request outstanding flag
+    UChar   _pad[3];            // +0x01
+    long    fReqType;           // +0x04  request type tag
+    long    fMsgToken[4];       // +0x08  TUMsgToken (16 bytes)
+};                              // total: 24 bytes (0x18)
+
+static_assert(sizeof(MsgContainer) == 24, "MsgContainer must be 24 bytes");
+
+// Number of IPC channels
+static const int kNumCommToolChannels = 7;
+
+// Channel index for GetCommEvent requests
+static const CommToolChannelNumber kGetEventChannel = (CommToolChannelNumber)3;
+
+// Sentinel stored in fGetEventReply.fResult when no event is buffered
+static const NewtonErr kGetCommEventPending       = -16016; // 0xFFFFC170
+static const NewtonErr kCommErrNoGetCommEvent     = -16015; // 0xFFFFC171
+static const NewtonErr kCommErrKilledGetCommEvent = -16005; // 0xFFFFC17B
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  TCommTool  —  inferred class definition
+//
+//  Object size: ~632 bytes (0x278)
+//  Confirmed fields:
+//    +0x00  vtable pointer           (from TAskUser / TUTaskWorld base)
+//    +0x08  fField8                  (long)
+//    +0x10  fField16                 (long)
+//    +0x44  fMsgSize                 (long)   — size of last received IPC msg
+//    +0x48  fMsgData[0x40]           (byte[64]) — inline IPC receive buffer
+//    +0x94  fMsgContainers[7]        (MsgContainer[7], 7×24=168 bytes, ends at +0x13B)
+//    +0xDC  = fMsgContainers[3].fPending  (GetEvent channel pending flag)
+//    +0x178 fOpenOptInfo             (was fControlOptInfo — corrected from Blunt-2 analysis)
+//    +0x1D8 fGetEventReply           (TCommToolGetEventReply, 36 bytes, inline)
+//    +0x1E0 fGetEventReply.fResult   (NewtonErr state sentinel, sub-offset +8)
+//    +0x1C8 fGetBufferList           (pointer)
+//    +0x1CC fTCommToolInputBufferSize (long)
+// ─────────────────────────────────────────────────────────────────────────────
 class TCommTool {
 public:
-	void Accept();
-	void AcceptComplete();
-	void AcceptOptionsComplete();
-	void AcceptStart();
-	void AddCurrentOptions();
-	void AddDefaultOptions();
-	void AllowAbort();
-	void Bind();
-	void BindComplete();
-	void BindOptionsComplete();
-	void BindStart();
-	void Close();
-	void CloseComplete();
-	void CompleteRequest();
-	void Connect();
-	void ConnectCheck();
-	void ConnectComplete();
-	void ConnectOptionsComplete();
-	void ConnectStart();
-	void CopyBackConnectPB();
-	void CreatePort();
-	void Disconnect();
-	void DisconnectComplete();
-	void DoControl();
-	void DoKillControl();
-	void DoKillGetCommEvent();
-	void DoStatus();
-	void FlushChannel();
-	void ForwardOptions();
-	void GetBytesImmediate();
-	void GetCommEvent();
-	void GetComplete();
-	void GetConnectState();
-	void GetNextTermProc();
-	void GetOptionsComplete();
-	void GetProtAddr();
-	void GetToolPort();
-	void HandleInternalEvent();
-	void HandleReply();
-	void HandleRequest();
-	void HandleTimerTick();
-	void HoldAbort();
-	void ImportConnectPB();
-	void InitAsyncRPCMsg();
-	void KillGetComplete();
-	void KillPutComplete();
-	void KillRequestComplete();
-	void Listen();
-	void ListenComplete();
-	void ListenOptionsComplete();
-	void ListenStart();
-	void Open();
-	void OpenComplete();
-	void OpenContinue();
-	void OpenOptionsComplete();
-	void OpenStart();
-	void OptionMgmt();
-	void OptionMgmtComplete();
-	void PostCommEvent();
-	void PrepControlRequest();
-	void PrepGetRequest();
-	void PrepKillRequest();
-	void PrepPutRequest();
-	void PrepResArbRequest();
-	void ProcessCommOptionComplete();
-	void ProcessControlOptions();
-	void ProcessGetBytesOptionComplete();
-	void ProcessGetBytesOptionStart();
-	void ProcessOption();
-	void ProcessOptionComplete();
-	void ProcessOptionStart();
-	void ProcessOptions();
-	void ProcessOptionsCleanUp();
-	void ProcessOptionsComplete();
-	void ProcessOptionsContinue();
-	void ProcessPutBytesOptionComplete();
-	void ProcessPutBytesOptionStart();
-	void PutComplete();
-	void PutOptionsComplete();
-	void Release();
-	void ReleaseComplete();
-	void ReleaseStart();
-	void RequestTypeToChannelNumber();
-	void ResArbClaimNotification();
-	void ResArbRelease();
-	void ResArbReleaseComplete();
-	void ResArbReleaseStart();
-	void SetChannelFilter();
-	void ShouldAbort();
-	void StartAbort();
-	TCommTool();
-	void TaskConstructor();
-	void TaskDestructor();
-	void TaskMain();
-	void TerminateComplete();
-	void TerminateConnection();
-	void UnRegisterPort();
-	void Unbind();
-	void UnbindComplete();
-	void UnbindStart();
-	~TCommTool();
+    void Accept();
+    void AcceptComplete();
+    void AcceptOptionsComplete();
+    void AcceptStart();
+    void AddCurrentOptions();
+    void AddDefaultOptions();
+    void AllowAbort();
+    void Bind();
+    void BindComplete();
+    void BindOptionsComplete();
+    void BindStart();
+    void Close();
+    void CloseComplete();
+    void CompleteRequest(CommToolChannelNumber channel, NewtonErr result);
+    void CompleteRequest(CommToolChannelNumber channel, NewtonErr result, TCommToolReply& reply);
+    void Connect();
+    void ConnectCheck();
+    void ConnectComplete();
+    void ConnectOptionsComplete();
+    void ConnectStart();
+    void CopyBackConnectPB();
+    void CreatePort();
+    void Disconnect();
+    void DisconnectComplete();
+    void DoControl();
+    void DoKillControl();
+    void DoKillGetCommEvent();
+    void DoStatus();
+    void FlushChannel();
+    void ForwardOptions();
+    void GetBytesImmediate();
+    void GetCommEvent();
+    void GetComplete();
+    void GetConnectState();
+    void GetNextTermProc();
+    void GetOptionsComplete();
+    void GetProtAddr();
+    void GetToolPort();
+    void HandleInternalEvent();
+    void HandleReply();
+    void HandleRequest();
+    void HandleTimerTick();
+    void HoldAbort();
+    void ImportConnectPB();
+    void InitAsyncRPCMsg();
+    void KillGetComplete();
+    void KillPutComplete();
+    void KillRequestComplete(CommToolRequestType type, NewtonErr result);
+    void Listen();
+    void ListenComplete();
+    void ListenOptionsComplete();
+    void ListenStart();
+    void Open();
+    void OpenComplete();
+    void OpenContinue();
+    void OpenOptionsComplete();
+    void OpenStart();
+    void OptionMgmt();
+    void OptionMgmtComplete();
+    NewtonErr PostCommEvent(TCommToolGetEventReply& theEvent, NewtonErr result);
+    void PrepControlRequest();
+    void PrepGetRequest();
+    void PrepKillRequest();
+    void PrepPutRequest();
+    void PrepResArbRequest();
+    void ProcessCommOptionComplete();
+    void ProcessControlOptions();
+    void ProcessGetBytesOptionComplete();
+    void ProcessGetBytesOptionStart();
+    void ProcessOption();
+    void ProcessOptionComplete();
+    void ProcessOptionStart();
+    void ProcessOptions();
+    void ProcessOptionsCleanUp();
+    void ProcessOptionsComplete();
+    void ProcessOptionsContinue();
+    void ProcessPutBytesOptionComplete();
+    void ProcessPutBytesOptionStart();
+    void PutComplete();
+    void PutOptionsComplete();
+    void Release();
+    void ReleaseComplete();
+    void ReleaseStart();
+    CommToolChannelNumber RequestTypeToChannelNumber(CommToolRequestType type);
+    void ResArbClaimNotification();
+    void ResArbRelease();
+    void ResArbReleaseComplete();
+    void ResArbReleaseStart();
+    void SetChannelFilter(CommToolRequestType type, UChar filter);
+    void ShouldAbort();
+    void StartAbort();
+    TCommTool();
+    void TaskConstructor();
+    void TaskDestructor();
+    void TaskMain();
+    void TerminateComplete();
+    void TerminateConnection();
+    void UnRegisterPort();
+    void Unbind();
+    void UnbindComplete();
+    void UnbindStart();
+    ~TCommTool();
 
 protected:
-	long fField8; // Offset: 8
-	long fField16; // Offset: 16
-	long fField24; // Offset: 24
-	long fField28; // Offset: 28
-	long fField32; // Offset: 32
-	long fField36; // Offset: 36
-	long fField40; // Offset: 40
-	long fField44; // Offset: 44
-	long fField84; // Offset: 84
-	long fField88; // Offset: 88
-	char fField96; // Offset: 96
-	long fField140; // Offset: 140
-	char fField148; // Offset: 148
-	long fField152; // Offset: 152
-	char fField172; // Offset: 172
-	long fField176; // Offset: 176
-	char fField196; // Offset: 196
-	long fField200; // Offset: 200
-	char fField220; // Offset: 220
-	long fField316; // Offset: 316
-	long fField320; // Offset: 320
-	char fField324; // Offset: 324
-	long fField372; // Offset: 372
-	long fField376; // Offset: 376
-	long fField380; // Offset: 380
-	long fField388; // Offset: 388
-	long fField396; // Offset: 396
-	long fField400; // Offset: 400
-	long fField404; // Offset: 404
-	long fField408; // Offset: 408
-	long fField412; // Offset: 412
-	long fField424; // Offset: 424
-	long fField428; // Offset: 428
-	long fField432; // Offset: 432
-	long fField436; // Offset: 436
-	long fField448; // Offset: 448
-	char fField452; // Offset: 452
-	char fField453; // Offset: 453
-	char fField454; // Offset: 454
-	char fField455; // Offset: 455
-	long fField456; // Offset: 456
-	long fField460; // Offset: 460
-	char fField464; // Offset: 464
-	char fField465; // Offset: 465
-	char fField466; // Offset: 466
-	long fField468; // Offset: 468
-	long fField480; // Offset: 480
-	long fField488; // Offset: 488
-	long fField500; // Offset: 500
-	long fField504; // Offset: 504
-	long fField508; // Offset: 508
-	char fField512; // Offset: 512
-	char fField513; // Offset: 513
-	long fField516; // Offset: 516
-	long fField520; // Offset: 520
-	long fField524; // Offset: 524
-	long fField528; // Offset: 528
-	long fField532; // Offset: 532
-	long fField536; // Offset: 536
-	long fField540; // Offset: 540
-	long fField600; // Offset: 600
-	long fField604; // Offset: 604
-	long fField608; // Offset: 608
-	long fField612; // Offset: 612
-	long fField616; // Offset: 616
+    // ── Base class fields (TUTaskWorld / TAskUser) ────────────────────────
+    // +0x00  vtable
+    long    fField8;                    // +0x08
+    long    fField16;                   // +0x10
+    long    fField24;                   // +0x18
+    long    fField28;                   // +0x1C
+    long    fField32;                   // +0x20
+    long    fField36;                   // +0x24
+    long    fField40;                   // +0x28
+    long    fField44;                   // +0x2C  (was fField44, not yet named)
+
+    // ── IPC receive buffer ────────────────────────────────────────────────
+    long    fMsgSize;                   // +0x44  size of last received IPC message
+    UChar   fMsgData[0x40];            // +0x48  inline 64-byte message data buffer
+
+    // ── Per-channel request containers ───────────────────────────────────
+    // 7 channels × 24 bytes = 168 bytes, spans +0x94..+0x13B
+    // fMsgContainers[3].fPending = *(this + 0xDC)
+    MsgContainer fMsgContainers[kNumCommToolChannels]; // +0x94
+
+    // ── Additional fields (partially named) ──────────────────────────────
+    long    fField140;                  // +0x8C  — NOTE: in TConnectionEnd this is
+                                        //          fMsgContainers[3].fPending directly;
+                                        //          in TCommTool the pending flag is at +0xDC
+    char    fField148;                  // +0x94  (overlaps container array start in scaffold;
+                                        //          needs reconciliation)
+    long    fField152;                  // +0x98
+    char    fField172;                  // +0xAC
+    long    fField176;                  // +0xB0
+    char    fField196;                  // +0xC4
+    long    fField200;                  // +0xC8
+    char    fField220;                  // +0xDC  = fMsgContainers[3].fPending
+
+    // ── Option / connect state ────────────────────────────────────────────
+    long    fField316;                  // +0x13C
+    long    fField320;                  // +0x140
+    char    fField324;                  // +0x144
+
+    // ── Buffer and address management ─────────────────────────────────────
+    long    fField372;                  // +0x174
+    long    fOpenOptInfo;               // +0x178  (formerly fControlOptInfo — corrected)
+    long    fField380;                  // +0x17C
+    long    fField388;                  // +0x184
+
+    // ── GetEvent reply buffer ─────────────────────────────────────────────
+    // Inline TCommToolGetEventReply (36 bytes).
+    // fGetEventReply.fResult (+0x1E0) is the state sentinel:
+    //   kGetCommEventPending (-16016) = no event queued
+    //   anything else                = event waiting for GetCommEvent to drain
+    TCommToolGetEventReply fGetEventReply; // +0x1D8  (36 bytes, ends at +0x1FB)
+
+    // ── Buffer list / input size ──────────────────────────────────────────
+    void*   fGetBufferList;             // +0x1C8  (confirmed from TRFCOMMTool analysis)
+    long    fTCommToolInputBufferSize;  // +0x1CC
+
+    // ── Remaining scaffold-discovered fields ─────────────────────────────
+    long    fField396;                  // +0x18C
+    long    fField400;                  // +0x190  (= fGetEventReply.fResult alias above)
+    long    fField404;                  // +0x194
+    long    fField408;                  // +0x198
+    long    fField412;                  // +0x19C
+    long    fField424;                  // +0x1A8
+    long    fField428;                  // +0x1AC
+    long    fField432;                  // +0x1B0
+    long    fField436;                  // +0x1B4
+    long    fField448;                  // +0x1C0
+    char    fField452;                  // +0x1C4
+    char    fField453;                  // +0x1C5
+    char    fField454;                  // +0x1C6
+    char    fField455;                  // +0x1C7
+    long    fField456;                  // +0x1C8  (alias for fGetBufferList above)
+    long    fField460;                  // +0x1CC  (alias for fTCommToolInputBufferSize)
+    char    fField464;                  // +0x1D0
+    char    fField465;                  // +0x1D1
+    char    fField466;                  // +0x1D2
+    long    fField468;                  // +0x1D4
+    long    fField480;                  // +0x1E0  (= fGetEventReply.fResult)
+    long    fField488;                  // +0x1E8
+    long    fField500;                  // +0x1F4
+    long    fField504;                  // +0x1F8
+    long    fField508;                  // +0x1FC
+    char    fField512;                  // +0x200
+    char    fField513;                  // +0x201
+    long    fField516;                  // +0x204
+    long    fField520;                  // +0x208
+    long    fField524;                  // +0x20C
+    long    fField528;                  // +0x210
+    long    fField532;                  // +0x214
+    long    fField536;                  // +0x218
+    long    fField540;                  // +0x21C
+    long    fField600;                  // +0x258
+    long    fField604;                  // +0x25C
+    long    fField608;                  // +0x260
+    long    fField612;                  // +0x264
+    long    fField616;                  // +0x268
 };
 
-#endif
+#endif // __INFERRED_TCOMMTOOL_H

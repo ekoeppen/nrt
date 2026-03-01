@@ -118,6 +118,7 @@ func (e *Engine) analyzeFunction(fn *asm.Function) {
 					accType = Write
 				}
 
+
 				if fn.ClassName != "" {
 					if _, ok := e.FieldUsers[fn.ClassName]; !ok {
 						e.FieldUsers[fn.ClassName] = make(map[uint64][]*FieldAccess)
