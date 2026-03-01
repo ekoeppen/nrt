@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"newton/reconstructor/pkg/analysis"
 	"newton/reconstructor/pkg/asm"
 	"newton/reconstructor/pkg/cpp"
 	"github.com/spf13/cobra"
@@ -160,34 +161,50 @@ func runScaffold() {
 }
 
 func analyzeFunction(fn *asm.Function, meta *ClassMeta, allInsts map[uint64]*asm.Instruction, addrToSymbol map[uint64]*asm.Function) {
-	thisReg := "r0"
+	// Mirror the multi-register 'this' tracking from analysis.Engine.analyzeFunction.
+	thisRegs := map[string]bool{"r0": true}
+	isThisAccess := func(args string) bool {
+		for reg := range thisRegs {
+			if strings.Contains(args, "["+reg) {
+				return true
+			}
+		}
+		return false
+	}
+
 	for _, inst := range fn.Instructions {
-		if inst.Mnemonic == "mov" && (strings.HasPrefix(inst.Args, "r4, r0") || strings.HasPrefix(inst.Args, "r5, r0")) {
-			thisReg = inst.Args[:2]
+		if inst.Mnemonic == "mov" {
+			parts := strings.SplitN(inst.Args, ", ", 2)
+			if len(parts) == 2 {
+				dst, src := strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
+				calleeSaved := dst == "r4" || dst == "r5" || dst == "r6" ||
+					dst == "r7" || dst == "r8" || dst == "r9" || dst == "r10" || dst == "r11"
+				if calleeSaved && thisRegs[src] {
+					thisRegs[dst] = true
+				}
+				if dst == "r0" && !thisRegs[src] {
+					delete(thisRegs, "r0")
+				}
+			}
+		}
+		if inst.Mnemonic == "bl" {
+			delete(thisRegs, "r0")
 		}
 
-		if (strings.HasPrefix(inst.Mnemonic, "ldr") || strings.HasPrefix(inst.Mnemonic, "str")) && strings.Contains(inst.Args, "["+thisReg) {
+		if typeName, size, _, _, isMemAccess := analysis.FieldTypeFromMnemonic(inst.Mnemonic); isMemAccess && isThisAccess(inst.Args) {
 			re := regexp.MustCompile(`#(\d+)`)
 			match := re.FindStringSubmatch(inst.Args)
 			if match != nil {
 				offset, _ := strconv.ParseUint(match[1], 10, 64)
-				size := 4
-				typeName := "long"
-				if strings.HasSuffix(inst.Mnemonic, "b") {
-					size = 1
-					typeName = "char"
-				} else if strings.HasSuffix(inst.Mnemonic, "h") {
-					size = 2
-					typeName = "short"
-				}
+				// Upgrade to widest observed type (long > short > char).
 				if existing, ok := meta.Fields[offset]; !ok || existing.Size < size {
 					meta.Fields[offset] = FieldInfo{Offset: offset, Type: typeName, Size: size, Name: fmt.Sprintf("fField%d", offset)}
 				}
 			}
 		}
 
-		// VTable assignment
-		if inst.Mnemonic == "str" && strings.Contains(inst.Args, ", ["+thisReg+"]") && !strings.Contains(inst.Args, "#") {
+		// VTable assignment: str rX, [thisReg] with no offset = writing vtable pointer
+		if inst.Mnemonic == "str" && isThisAccess(inst.Args) && !strings.Contains(inst.Args, "#") {
 			// Find register that was stored
 			storedReg := strings.Split(inst.Args, ",")[0]
 			vtableAddr := uint64(0)

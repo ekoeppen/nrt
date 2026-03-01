@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"sort"
-	"strings"
 
 	"newton/reconstructor/pkg/analysis"
 	"newton/reconstructor/pkg/asm"
@@ -72,11 +71,11 @@ func runAnalyze() {
 			uOff := uint64(off)
 			accesses := fieldUsers[uOff]
 
+			// Derive the widest field type from ClassMetadata (populated by the engine).
 			fieldType := "long"
-			for _, acc := range accesses {
-				// Simple check on the first instruction of the function that accesses it
-				if strings.HasSuffix(acc.Func.Instructions[0].Mnemonic, "b") {
-					// This logic is a bit flawed but serves as a placeholder
+			if meta != nil {
+				if fi, ok := meta.Fields[uOff]; ok {
+					fieldType = fi.Type
 				}
 			}
 

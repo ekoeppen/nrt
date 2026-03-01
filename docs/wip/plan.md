@@ -45,7 +45,7 @@ FieldInfo.Type: values now "char" (1), "short" (2), "long" (4) — widest observ
 
 ## Steps
 
-### [ ] Add fieldTypeFromMnemonic helper to analysis.go
+### [x] Add fieldTypeFromMnemonic helper to analysis.go
 
 #### Precondition
 
@@ -62,4 +62,58 @@ Helper function available in the analysis package.
 #### Verification
 
 Helper compiles; unit test or manual check that ldrb → ("char",1,true,false,true), str → ("long",4,false,true,true), ldrsh → ("short",2,true,false,true), mov → ("",0,false,false,false).
+
+### [x] Replace HasPrefix guard in analysis.go analyzeFunction
+
+#### Precondition
+
+Helper exists
+
+#### Action
+
+In analyzeFunction's field-access loop, replace the HasPrefix("ldr")/HasPrefix("str") condition with a call to fieldTypeFromMnemonic. Derive accType from isLoad/isStore. When inserting into ClassMetadata.Fields, if an entry already exists, upgrade to the widest type (long > short > char).
+
+#### Result
+
+ldrb/strb/ldrh/strh/ldrsb accesses are all tracked with the correct type.
+
+#### Verification
+
+nrt query --accessors-of TConnectionEnd:140 returns ldrb reads and strb writes.
+
+### [x] Mirror fix in scaffold.go analyzeFunction
+
+#### Precondition
+
+analysis.go fix is done
+
+#### Action
+
+Apply the identical mnemonic-dispatch fix to analyzeFunction in scaffold.go, replacing its HasPrefix("ldr")/HasPrefix("str") guard and hardcoded size logic.
+
+#### Result
+
+scaffold.go field tracking matches analysis.go behaviour
+
+#### Verification
+
+Build passes; scaffold output for TConnectionEnd marks byte fields as char.
+
+### [x] Build and verify
+
+#### Precondition
+
+Both files edited
+
+#### Action
+
+Build nrt binary and run a quick sanity check: nrt query --accessors-of TConnectionEnd:140 and nrt analyze --class TConnectionEnd, confirm byte fields appear.
+
+#### Result
+
+Byte-sized field accesses confirmed in tool output
+
+#### Verification
+
+ldrb/strb hits appear for offset 140 (fMsgContainers[3].fRequestPending)
 

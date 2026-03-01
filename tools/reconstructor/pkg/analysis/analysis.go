@@ -59,7 +59,25 @@ func (e *Engine) Analyze() {
 }
 
 func (e *Engine) analyzeFunction(fn *asm.Function) {
-	thisReg := "r0"
+	// thisRegs is the set of registers currently holding 'this'.
+	// ARM calling convention: 'this' arrives in r0.  Prologues often copy it
+	// to r4 or r5 for preservation across calls, but r0 stays valid until it
+	// is clobbered by the next call return or an explicit assignment.
+	// We track all registers that have been observed to hold 'this' and only
+	// remove r0 from the set when we see it written to by a non-copy instruction
+	// (bl return, ldm restoring r0, or a new mov r0 from a non-this source).
+	thisRegs := map[string]bool{"r0": true}
+
+	// isThisAccess returns true when the instruction's memory operand uses any
+	// currently-tracked 'this' register as the base.
+	isThisAccess := func(args string) bool {
+		for reg := range thisRegs {
+			if strings.Contains(args, "["+reg) {
+				return true
+			}
+		}
+		return false
+	}
 
 	// Analyze constructor logic for size and base class
 	if fn.ClassName != "" && (strings.Contains(fn.Name, "__ct") || strings.Contains(fn.Name, "::"+fn.ClassName+"(")) {
@@ -102,22 +120,45 @@ func (e *Engine) analyzeFunction(fn *asm.Function) {
 			}
 		}
 
-		// Field access analysis
-		// Track 'this' pointer - often moved from r0 to r4 or r5
-		if inst.Mnemonic == "mov" && (strings.HasPrefix(inst.Args, "r4, r0") || strings.HasPrefix(inst.Args, "r5, r0")) {
-			thisReg = inst.Args[:2]
+		// Field access analysis: maintain the set of registers holding 'this'.
+		//
+		// Propagate: "mov rX, rY" where rY is in thisRegs → rX also holds 'this'.
+		// ARM compilers typically only copy to callee-saved registers (r4–r11),
+		// so we allow copies to r4, r5, r6, r7, r8, r9, r10, r11.
+		if inst.Mnemonic == "mov" {
+			parts := strings.SplitN(inst.Args, ", ", 2)
+			if len(parts) == 2 {
+				dst := strings.TrimSpace(parts[0])
+				src := strings.TrimSpace(parts[1])
+				calleeSaved := dst == "r4" || dst == "r5" || dst == "r6" ||
+					dst == "r7" || dst == "r8" || dst == "r9" ||
+					dst == "r10" || dst == "r11"
+				if calleeSaved && thisRegs[src] {
+					thisRegs[dst] = true
+				}
+				// If dst is a this-register being overwritten with a non-this source,
+				// evict it (only evict r0; preserved regs are never reused mid-function
+				// for non-this purposes in typical ARM ABI prologues).
+				if dst == "r0" && !thisRegs[src] {
+					delete(thisRegs, "r0")
+				}
+			}
+		}
+		// A call return clobbers r0; remove it from the this-set.
+		if inst.Mnemonic == "bl" {
+			delete(thisRegs, "r0")
 		}
 
-		if (strings.HasPrefix(inst.Mnemonic, "ldr") || strings.HasPrefix(inst.Mnemonic, "str")) && strings.Contains(inst.Args, "["+thisReg) {
+		if typeName, _, isLoad, isStore, ok := FieldTypeFromMnemonic(inst.Mnemonic); ok && isThisAccess(inst.Args) {
 			re := regexp.MustCompile(`#(\d+)`)
 			match := re.FindStringSubmatch(inst.Args)
 			if match != nil {
 				offset, _ := strconv.ParseUint(match[1], 10, 64)
 				accType := Read
-				if strings.HasPrefix(inst.Mnemonic, "str") {
+				if isStore {
 					accType = Write
 				}
-
+				_ = isLoad // suppress unused warning; accType already encodes direction
 
 				if fn.ClassName != "" {
 					if _, ok := e.FieldUsers[fn.ClassName]; !ok {
@@ -130,15 +171,13 @@ func (e *Engine) analyzeFunction(fn *asm.Function) {
 						Addr:   inst.AddressInt,
 						Type:   accType,
 					})
-					
-					// Also update ClassMetadata fields
+
+					// Update ClassMetadata fields; upgrade to widest observed type
+					// (e.g. if a byte access is seen first, a later word access upgrades it).
 					meta := e.getOrCreateClass(fn.ClassName)
-					if _, ok := meta.Fields[offset]; !ok {
-						fieldType := "long"
-						if strings.HasSuffix(inst.Mnemonic, "b") {
-							fieldType = "char"
-						}
-						meta.Fields[offset] = FieldInfo{Offset: offset, Type: fieldType}
+					if existing, exists := meta.Fields[offset]; !exists ||
+						fieldTypePriority(typeName) > fieldTypePriority(existing.Type) {
+						meta.Fields[offset] = FieldInfo{Offset: offset, Type: typeName}
 					}
 				}
 			}
@@ -156,6 +195,59 @@ func (e *Engine) getOrCreateClass(name string) *ClassMetadata {
 	}
 	e.Classes[name] = meta
 	return meta
+}
+
+// fieldTypeFromMnemonic maps an ARM load/store mnemonic to its field metadata.
+// Returns (typeName, byteSize, isLoad, isStore, ok).
+// ok is false for any mnemonic that is not a memory access.
+//
+// Mnemonics handled:
+//   ldr  / str   → "long"  / 4 bytes
+//   ldrh / strh  → "short" / 2 bytes
+//   ldrb / strb  → "char"  / 1 byte
+//   ldrsb        → "char"  / 1 byte  (signed byte load)
+//   ldrsh        → "short" / 2 bytes (signed halfword load)
+//   ldm* / stm*  → not tracked (multi-register, no single field offset)
+// FieldTypeFromMnemonic maps an ARM load/store mnemonic to its field metadata.
+// Returns (typeName, byteSize, isLoad, isStore, ok).
+// ok is false for any mnemonic that is not a single-register memory access.
+// Exported so scaffold.go and other packages can share the same dispatch table.
+func FieldTypeFromMnemonic(m string) (typeName string, size int, isLoad bool, isStore bool, ok bool) {
+	switch m {
+	case "ldr":
+		return "long", 4, true, false, true
+	case "str":
+		return "long", 4, false, true, true
+	case "ldrh":
+		return "short", 2, true, false, true
+	case "strh":
+		return "short", 2, false, true, true
+	case "ldrb":
+		return "char", 1, true, false, true
+	case "strb":
+		return "char", 1, false, true, true
+	case "ldrsb":
+		return "char", 1, true, false, true
+	case "ldrsh":
+		return "short", 2, true, false, true
+	default:
+		return "", 0, false, false, false
+	}
+}
+
+// fieldTypePriority returns a numeric priority for a field type name.
+// Higher priority wins when upgrading a field entry to the widest observed access.
+func fieldTypePriority(typeName string) int {
+	switch typeName {
+	case "long":
+		return 3
+	case "short":
+		return 2
+	case "char":
+		return 1
+	default:
+		return 0
+	}
 }
 
 func extractClassNameFromSymbol(sym string) string {
