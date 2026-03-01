@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	vcallClassName string
-	vcallOffsetStr string
+	vcallClassName  string
+	vcallOffsetStr  string
+	vcallVTableAddr string
 )
 
 var vcallCmd = &cobra.Command{
@@ -27,6 +28,7 @@ var vcallCmd = &cobra.Command{
 func init() {
 	vcallCmd.Flags().StringVar(&vcallClassName, "class", "", "Class name to analyze")
 	vcallCmd.Flags().StringVar(&vcallOffsetStr, "offset", "", "Offset in decimal or hex (e.g. 56 or 0x38)")
+	vcallCmd.Flags().StringVar(&vcallVTableAddr, "vtable-addr", "", "Manual VTable address override (hex)")
 	vcallCmd.MarkFlagRequired("class")
 	vcallCmd.MarkFlagRequired("offset")
 	rootCmd.AddCommand(vcallCmd)
@@ -44,10 +46,19 @@ func runVCall() {
 		log.Fatalf("Load error: %v", err)
 	}
 
-	// 1. Find the constructor to get the VTable address
-	vtableAddr := findVTableAddr(symbols, vcallClassName)
-	if vtableAddr == 0 {
-		log.Fatalf("Could not find VTable address for class %s", vcallClassName)
+	var vtableAddr uint64
+	if vcallVTableAddr != "" {
+		v, err := strconv.ParseUint(strings.TrimPrefix(vcallVTableAddr, "0x"), 16, 64)
+		if err != nil {
+			log.Fatalf("Invalid vtable-addr: %v", err)
+		}
+		vtableAddr = v
+	} else {
+		// 1. Find the constructor to get the VTable address
+		vtableAddr = findVTableAddr(symbols, vcallClassName)
+		if vtableAddr == 0 {
+			log.Fatalf("Could not find VTable address for class %s. Use --vtable-addr for manual override.", vcallClassName)
+		}
 	}
 
 	fmt.Printf("Class:          %s\n", vcallClassName)
