@@ -160,3 +160,36 @@ In priority order:
 | `intermediate/PCECallBackWrapper.cpp` | Second thunk layer; jumps to `TConnectionEnd::$*` |
 | `intermediate/include/TNewScriptEndpointClient.h` | NS endpoint client — `PostInput`, `RcvComplete` |
 | `Includes/CommAPI/Endpoint.h` | DDK `TEndpoint` — the client-facing API |
+
+### **Detailed Update: "Bug 1" Root Cause Confirmed**
+
+The reverse-engineered assembly of `TCommTool::GetCommEvent` and `TCommTool::PostCommEvent` (at ROM addresses `0x6F29C` and `0x6F328`) confirms the exact failure mechanism:
+
+1.  **Slot Architecture**: `TCommTool` provides a single-event buffer at offset `+0x1D8` (`fGetEventReply`). This buffer is initialized with the sentinel value `kGetCommEventPending` (`-16016`).
+2.  **Base Class Logic**: 
+    - `PostCommEvent` checks if the OS IPC channel (channel 3) has a pending request.
+    - If no request is pending, it returns `kCommErrNoGetCommEvent` (-16015).
+    - `GetCommEvent` (the virtual poller) checks if `fGetEventReply` contains anything other than the sentinel. If it does, it tries to deliver it.
+3.  **The Blunt-2 Flaw**: In `TRFCOMMTool::HandleRequest`, the event is constructed on the stack:
+    ```cpp
+    TCommToolGetEventReply event; // Local stack variable
+    event.fEventCode = 1;
+    // ...
+    PostCommEvent (event, noErr); // Return value ignored!
+    ```
+4.  **Result**: Because the return value of `PostCommEvent` is ignored and the local `event` is never copied into the class's `fGetEventReply` buffer, any event that arrives when the client task is busy is lost forever.
+
+### **Detailed Update: "Bug 2" Buffer Overflow Confirmed**
+
+The memory corruption risk is now confirmed by examining `RFCOMMTool.h` and `RFCOMMTool.cp`:
+
+1.  **Allocation**: `fSavedData = new UByte[2096]` (where `MAX_SAVE` is `2096`).
+2.  **Logic**: In the `E_DATA` handler (line 111-114), the code performs a `memcpy` of all data that couldn't fit into the current client buffer:
+    ```cpp
+    if (e->fLength > n) {
+        memcpy (fSavedData + fSavedDataAmount, e->fData + n, e->fLength - n);
+        fSavedDataAmount += (e->fLength - n);
+    }
+    ```
+3.  **The Failure**: There is no bounds check. If `fSavedDataAmount` is already near 2096, any additional incoming Bluetooth packet will overflow the heap.
+4.  **Impact**: The Newton OS heap is extremely sensitive to corruption. This overflow will likely overwrite the header of the next heap block, leading to a system-wide `Bus Error` or `Memory Manager Error` the next time any task attempts to allocate memory.
